@@ -1,24 +1,23 @@
-# W-Next AI Drawio
+# Next AI Draw.io
 
 <div align="center">
 
-**多提供商AI驱动的图表创建工具 - 支持GLM、Qwen、Doubao等国产大模型**
+**AI-Powered Diagram Creation Tool - Chat, Draw, Visualize**
 
-English | [中文](./docs/README_CN.md)
+English | [中文](./docs/README_CN.md) | [日本語](./docs/README_JA.md)
+
+[![TrendShift](https://trendshift.io/api/badge/repositories/15449)](https://next-ai-drawio.jiang.jp/)
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Next.js](https://img.shields.io/badge/Next.js-16.x-black)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.x-61dafb)](https://react.dev/)
+[![Sponsor](https://img.shields.io/badge/Sponsor-❤-ea4aaa)](https://github.com/sponsors/DayuanJiang)
 
-一个集成了AI功能的Next.js网页应用，与draw.io图表无缝结合。特别优化支持国产大语言模型（GLM、Qwen、Doubao、Qiniu等）和国际主流AI提供商，通过自然语言命令创建、修改和增强图表。
+[![Live Demo](./public/live-demo-button.svg)](https://next-ai-drawio.jiang.jp/)
 
-**核心特性：**
-- 🎯 **多提供商支持**：原生支持智谱GLM、阿里通义Qwen、字节豆包Doubao、七牛云Qiniu等国产模型
-- 🇨🇳 **中文优先**：完全中文化界面，更好的中文图表生成体验
-- 🤖 **AI驱动**：通过自然语言对话生成和编辑图表
-- 📄 **文件支持**：支持PDF、TXT、MD等多种文件上传和分析
-- 🔄 **图表历史**：自动保存图表版本，可随时回溯
-- ☁️ **云架构支持**：内置AWS、GCP、Azure等专业图标库
+</div>
+
+A Next.js web application that integrates AI capabilities with draw.io diagrams. Create, modify, and enhance diagrams through natural language commands and AI-assisted visualization.
 
 
 
@@ -84,40 +83,24 @@ Here are some example prompts and their generated diagrams:
 
 ## Features
 
--   **Multi-Provider AI Support**: Native integration with Chinese AI models (GLM, Qwen, Doubao, Qiniu) and international providers (OpenAI, Anthropic, Google, Azure, AWS Bedrock)
--   **Chinese-First Interface**: Fully localized Chinese UI for better user experience
 -   **LLM-Powered Diagram Creation**: Leverage Large Language Models to create and manipulate draw.io diagrams directly through natural language commands
--   **File Upload Support**: Upload PDFs, text files, markdown, code files, and images for AI analysis and diagram generation
 -   **Image-Based Diagram Replication**: Upload existing diagrams or images and have the AI replicate and enhance them automatically
+-   **PDF & Text File Upload**: Upload PDF documents and text files to extract content and generate diagrams from existing documents
+-   **AI Reasoning Display**: View the AI's thinking process for supported models (OpenAI o1/o3, Gemini, Claude, etc.)
 -   **Diagram History**: Comprehensive version control that tracks all changes, allowing you to view and restore previous versions of your diagrams before the AI editing.
 -   **Interactive Chat Interface**: Communicate with AI to refine your diagrams in real-time
--   **Cloud Architecture Support**: Specialized support for generating AWS, GCP, and Azure architecture diagrams with official icons
+-   **Cloud Architecture Diagram Support**: Specialized support for generating cloud architecture diagrams (AWS, GCP, Azure)
 -   **Animated Connectors**: Create dynamic and animated connectors between diagram elements for better visualization
 
 ## Getting Started
 
 ### Try it Online
 
-No installation needed! Try the app directly on:
+No installation needed! Try the app directly on our demo site:
 
-Coming soon...
+[![Live Demo](./public/live-demo-button.svg)](https://next-ai-drawio.jiang.jp/)
 
-### Configuration
-
-This version is optimized for Chinese AI providers. Configure your preferred AI model in Settings:
-
-**Chinese Models:**
-- **GLM**: glm-4-plus, glm-4-vivid (智谱AI)
-- **Qwen**: qwen-max, qwen-turbo, qwen-vl-plus (阿里通义)
-- **Doubao**: doubao-pro-4k, doubao-lite-4k (字节跳动)
-- **Qiniu**: qiniu-deepseek-67b, qiniu-llama-3-70b (七牛云)
-
-**International Models:**
-- **OpenAI**: gpt-4o, o1, o3-mini
-- **Anthropic**: claude-sonnet-4-5, claude-opus-4-5
-- **Google**: gemini-2.5-pro, gemini-2.0-flash
-- **Azure**: GPT-4, GPT-4o
-- **AWS Bedrock**: Claude, Nova
+> Note: Due to high traffic, the demo site currently uses minimax-m2. For best results, we recommend self-hosting with Claude Sonnet 4.5 or Claude Opus 4.5.
 
 > **Bring Your Own API Key**: You can use your own API key to bypass usage limits on the demo site. Click the Settings icon in the chat panel to configure your provider and API key. Your key is stored locally in your browser and is never stored on the server.
 
@@ -156,8 +139,8 @@ Replace the environment variables with your preferred AI provider configuration.
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/wangfenghuan/w-next-ai-drawio.git
-cd w-next-ai-drawio
+git clone https://github.com/DayuanJiang/next-ai-draw-io
+cd next-ai-draw-io
 ```
 
 2. Install dependencies:
@@ -166,59 +149,7 @@ cd w-next-ai-drawio
 npm install
 ```
 
-3. Configure your AI provider (choose one):
-
-**For Chinese Models (Recommended):**
-```bash
-# GLM
-AI_PROVIDER=glm
-AI_MODEL=glm-4-plus
-GLM_API_KEY=your_api_key
-
-# Qwen
-AI_PROVIDER=qwen
-AI_MODEL=qwen-max
-QWEN_API_KEY=your_api_key
-
-# Doubao
-AI_PROVIDER=doubao
-AI_MODEL=doubao-pro-4k
-DOUBAO_API_KEY=your_api_key
-
-# Qiniu
-AI_PROVIDER=qiniu
-AI_MODEL=qiniu-deepseek-67b
-QINIU_API_KEY=your_api_key
-```
-
-**For International Models:**
-```bash
-# OpenAI
-AI_PROVIDER=openai
-AI_MODEL=gpt-4o
-OPENAI_API_KEY=your_api_key
-
-# Anthropic
-AI_PROVIDER=anthropic
-AI_MODEL=claude-sonnet-4-5
-ANTHROPIC_API_KEY=your_api_key
-
-# Google
-AI_PROVIDER=google
-AI_MODEL=gemini-2.5-pro
-GOOGLE_GENERATIVE_AI_API_KEY=your_api_key
-
-# Azure
-AI_PROVIDER=azure
-AI_MODEL=gpt-4o
-AZURE_API_KEY=your_api_key
-AZURE_RESOURCE_NAME=your_resource_name
-
-# AWS Bedrock
-AI_PROVIDER=bedrock
-AI_MODEL=anthropic.claude-sonnet-5-v2
-AWS_REGION=us-west-2
-```
+3. Configure your AI provider:
 
 Create a `.env.local` file in the root directory:
 
@@ -276,7 +207,7 @@ All providers except AWS Bedrock and OpenRouter support custom endpoints.
 
 **Model Requirements**: This task requires strong model capabilities for generating long-form text with strict formatting constraints (draw.io XML). Recommended models include Claude Sonnet 4.5, GPT-5.1, Gemini 3 Pro, and DeepSeek V3.2/R1.
 
-Note that `claude` series has trained on draw.io diagrams with cloud architecture logos like AWS, Azue, GCP. So if you want to create cloud architecture diagrams, this is the best choice.
+Note that `claude` series has trained on draw.io diagrams with cloud architecture logos like AWS, Azure, GCP. So if you want to create cloud architecture diagrams, this is the best choice.
 
 
 ## How It Works
@@ -318,6 +249,6 @@ For support or inquiries, please open an issue on the GitHub repository or conta
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=wangfenghuan/w-next-ai-drawio&type=date&legend=top-left)](https://www.star-history.com/#wangfenghuan/w-next-ai-drawio&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=DayuanJiang/next-ai-draw-io&type=date&legend=top-left)](https://www.star-history.com/#DayuanJiang/next-ai-draw-io&type=date&legend=top-left)
 
 ---

@@ -383,7 +383,16 @@ function detectProvider(): ProviderName | null {
             continue
         }
         if (process.env[envVar]) {
-            configuredProviders.push(provider as ProviderName)
+            // Azure requires additional config (baseURL or resourceName)
+            if (provider === "azure") {
+                const hasBaseUrl = !!process.env.AZURE_BASE_URL
+                const hasResourceName = !!process.env.AZURE_RESOURCE_NAME
+                if (hasBaseUrl || hasResourceName) {
+                    configuredProviders.push(provider as ProviderName)
+                }
+            } else {
+                configuredProviders.push(provider as ProviderName)
+            }
         }
     }
 
@@ -404,6 +413,18 @@ function validateProviderCredentials(provider: ProviderName): void {
             `${requiredVar} environment variable is required for ${provider} provider. ` +
                 `Please set it in your .env.local file.`,
         )
+    }
+
+    // Azure requires either AZURE_BASE_URL or AZURE_RESOURCE_NAME in addition to API key
+    if (provider === "azure") {
+        const hasBaseUrl = !!process.env.AZURE_BASE_URL
+        const hasResourceName = !!process.env.AZURE_RESOURCE_NAME
+        if (!hasBaseUrl && !hasResourceName) {
+            throw new Error(
+                `Azure requires either AZURE_BASE_URL or AZURE_RESOURCE_NAME to be set. ` +
+                    `Please set one in your .env.local file.`,
+            )
+        }
     }
 }
 
@@ -437,6 +458,16 @@ function validateProviderCredentials(provider: ProviderName): void {
  * - QINIU_BASE_URL: Qiniu endpoint (optional, defaults to https://api.qiniucdn.com/v1)
  */
 export function getAIModel(overrides?: ClientOverrides): ModelConfig {
+    // SECURITY: Prevent SSRF attacks (GHSA-9qf7-mprq-9qgm)
+    // If a custom baseUrl is provided, an API key MUST also be provided.
+    // This prevents attackers from redirecting server API keys to malicious endpoints.
+    if (overrides?.baseUrl && !overrides?.apiKey) {
+        throw new Error(
+            `API key is required when using a custom base URL. ` +
+                `Please provide your own API key in Settings.`,
+        )
+    }
+
     // Check if client is providing their own provider override
     const isClientOverride = !!(overrides?.provider && overrides?.apiKey)
 

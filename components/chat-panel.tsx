@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
 import {
     AlertTriangle,
+    MessageSquarePlus,
     PanelRightClose,
     PanelRightOpen,
     Settings,
@@ -17,45 +18,29 @@ import { FaGithub } from "react-icons/fa"
 import { Toaster, toast } from "sonner"
 import { ButtonWithTooltip } from "@/components/button-with-tooltip"
 import { ChatInput } from "@/components/chat-input"
-import { QuotaLimitToast } from "@/components/quota-limit-toast"
-import {
-    SettingsDialog,
-    STORAGE_ACCESS_CODE_KEY,
-    STORAGE_AI_API_KEY_KEY,
-    STORAGE_AI_BASE_URL_KEY,
-    STORAGE_AI_MODEL_KEY,
-    STORAGE_AI_PROVIDER_KEY,
-} from "@/components/settings-dialog"
+import { ResetWarningModal } from "@/components/reset-warning-modal"
+import { SettingsDialog } from "@/components/settings-dialog"
+import { useDiagram } from "@/contexts/diagram-context"
+import { getAIConfig } from "@/lib/ai-config"
+import { findCachedResponse } from "@/lib/cached-responses"
+import { isPdfFile, isTextFile } from "@/lib/pdf-utils"
+import { type FileData, useFileProcessor } from "@/lib/use-file-processor"
+import { useQuotaManager } from "@/lib/use-quota-manager"
+import { formatXML, isMxCellXmlComplete, wrapWithMxFile } from "@/lib/utils"
+import { ChatMessageDisplay } from "./chat-message-display"
 
 // localStorage keys for persistence
 const STORAGE_MESSAGES_KEY = "next-ai-draw-io-messages"
 const STORAGE_XML_SNAPSHOTS_KEY = "next-ai-draw-io-xml-snapshots"
 const STORAGE_SESSION_ID_KEY = "next-ai-draw-io-session-id"
 export const STORAGE_DIAGRAM_XML_KEY = "next-ai-draw-io-diagram-xml"
-const STORAGE_REQUEST_COUNT_KEY = "next-ai-draw-io-request-count"
-const STORAGE_REQUEST_DATE_KEY = "next-ai-draw-io-request-date"
-const STORAGE_TOKEN_COUNT_KEY = "next-ai-draw-io-token-count"
-const STORAGE_TOKEN_DATE_KEY = "next-ai-draw-io-token-date"
-const STORAGE_TPM_COUNT_KEY = "next-ai-draw-io-tpm-count"
-const STORAGE_TPM_MINUTE_KEY = "next-ai-draw-io-tpm-minute"
-
-import { useDiagram } from "@/contexts/diagram-context"
-import { findCachedResponse } from "@/lib/cached-responses"
-import {
-    extractPdfText,
-    extractTextFileContent,
-    isPdfFile,
-    isTextFile,
-    MAX_EXTRACTED_CHARS,
-} from "@/lib/pdf-utils"
-import { formatXML, wrapWithMxFile } from "@/lib/utils"
-import { ChatMessageDisplay } from "./chat-message-display"
 
 // Type for message parts (tool calls and their states)
 interface MessagePart {
     type: string
     state?: string
     toolName?: string
+    input?: { xml?: string; [key: string]: unknown }
     [key: string]: unknown
 }
 
@@ -79,31 +64,15 @@ interface ChatPanelProps {
 // Constants for tool states
 const TOOL_ERROR_STATE = "output-error" as const
 const DEBUG = process.env.NODE_ENV === "development"
+const MAX_AUTO_RETRY_COUNT = 1
 
 /**
- * Custom auto-resubmit logic for the AI chat.
- *
- * Strategy:
- * - When tools return errors (e.g., invalid XML), automatically resubmit
- *   the conversation to let the AI retry with corrections
- * - When tools succeed (e.g., diagram displayed), stop without AI acknowledgment
- *   to prevent unnecessary regeneration cycles
- *
- * This fixes the issue where successful diagrams were being regenerated
- * multiple times because the previous logic (lastAssistantMessageIsCompleteWithToolCalls)
- * auto-resubmitted on BOTH success and error.
- *
- * @param messages - Current conversation messages from AI SDK
- * @returns true to auto-resubmit (for error recovery), false to stop
+ * Check if auto-resubmit should happen based on tool errors.
+ * Only checks the LAST tool part (most recent tool call), not all tool parts.
  */
-function shouldAutoResubmit(messages: ChatMessage[]): boolean {
+function hasToolErrors(messages: ChatMessage[]): boolean {
     const lastMessage = messages[messages.length - 1]
     if (!lastMessage || lastMessage.role !== "assistant") {
-        if (DEBUG) {
-            console.log(
-                "[sendAutomaticallyWhen] No assistant message, returning false",
-            )
-        }
         return false
     }
 
@@ -113,31 +82,11 @@ function shouldAutoResubmit(messages: ChatMessage[]): boolean {
         ) || []
 
     if (toolParts.length === 0) {
-        if (DEBUG) {
-            console.log(
-                "[sendAutomaticallyWhen] No tool parts, returning false",
-            )
-        }
         return false
     }
 
-    // Only auto-resubmit if ANY tool has an error
-    const hasError = toolParts.some((part) => part.state === TOOL_ERROR_STATE)
-
-    if (DEBUG) {
-        if (hasError) {
-            console.log(
-                "[sendAutomaticallyWhen] Retrying due to errors in tools:",
-                toolParts
-                    .filter((p) => p.state === TOOL_ERROR_STATE)
-                    .map((p) => p.toolName),
-            )
-        } else {
-            console.log("[sendAutomaticallyWhen] No errors, stopping")
-        }
-    }
-
-    return hasError
+    const lastToolPart = toolParts[toolParts.length - 1]
+    return lastToolPart?.state === TOOL_ERROR_STATE
 }
 
 export default function ChatPanel({
@@ -186,11 +135,9 @@ export default function ChatPanel({
         ])
     }
 
-    const [files, setFiles] = useState<File[]>([])
-    // Store extracted PDF text with extraction status
-    const [pdfData, setPdfData] = useState<
-        Map<File, { text: string; charCount: number; isExtracting: boolean }>
-    >(new Map())
+    // File processing using extracted hook
+    const { files, pdfData, handleFileChange, setFiles } = useFileProcessor()
+
     const [showHistory, setShowHistory] = useState(false)
     const [showSettingsDialog, setShowSettingsDialog] = useState(false)
     const [, setAccessCodeRequired] = useState(false)
@@ -198,7 +145,8 @@ export default function ChatPanel({
     const [dailyRequestLimit, setDailyRequestLimit] = useState(0)
     const [dailyTokenLimit, setDailyTokenLimit] = useState(0)
     const [tpmLimit, setTpmLimit] = useState(0)
-    const [isManuallyStopped, setIsManuallyStopped] = useState(false)
+    const [showNewChatDialog, setShowNewChatDialog] = useState(false)
+    const [minimalStyle, setMinimalStyle] = useState(false)
 
     // Check config on mount
     useEffect(() => {
@@ -213,200 +161,12 @@ export default function ChatPanel({
             .catch(() => setAccessCodeRequired(false))
     }, [])
 
-    // Helper to check daily request limit
-    // Check if user has their own API key configured (bypass limits)
-    const hasOwnApiKey = useCallback((): boolean => {
-        const provider = localStorage.getItem(STORAGE_AI_PROVIDER_KEY)
-        const apiKey = localStorage.getItem(STORAGE_AI_API_KEY_KEY)
-        return !!(provider && apiKey)
-    }, [])
-
-    const checkDailyLimit = useCallback((): {
-        allowed: boolean
-        remaining: number
-        used: number
-    } => {
-        // Skip limit if user has their own API key
-        if (hasOwnApiKey()) return { allowed: true, remaining: -1, used: 0 }
-        if (dailyRequestLimit <= 0)
-            return { allowed: true, remaining: -1, used: 0 }
-
-        const today = new Date().toDateString()
-        const storedDate = localStorage.getItem(STORAGE_REQUEST_DATE_KEY)
-        let count = parseInt(
-            localStorage.getItem(STORAGE_REQUEST_COUNT_KEY) || "0",
-            10,
-        )
-
-        if (storedDate !== today) {
-            count = 0
-            localStorage.setItem(STORAGE_REQUEST_DATE_KEY, today)
-            localStorage.setItem(STORAGE_REQUEST_COUNT_KEY, "0")
-        }
-
-        return {
-            allowed: count < dailyRequestLimit,
-            remaining: dailyRequestLimit - count,
-            used: count,
-        }
-    }, [dailyRequestLimit, hasOwnApiKey])
-
-    // Helper to increment request count
-    const incrementRequestCount = useCallback((): void => {
-        const count = parseInt(
-            localStorage.getItem(STORAGE_REQUEST_COUNT_KEY) || "0",
-            10,
-        )
-        localStorage.setItem(STORAGE_REQUEST_COUNT_KEY, String(count + 1))
-    }, [])
-
-    // Helper to show quota limit toast (request-based)
-    const showQuotaLimitToast = useCallback(() => {
-        toast.custom(
-            (t) => (
-                <QuotaLimitToast
-                    used={dailyRequestLimit}
-                    limit={dailyRequestLimit}
-                    onDismiss={() => toast.dismiss(t)}
-                />
-            ),
-            { duration: 15000 },
-        )
-    }, [dailyRequestLimit, hasOwnApiKey])
-
-    // Helper to check daily token limit (checks if already over limit)
-    const checkTokenLimit = useCallback((): {
-        allowed: boolean
-        remaining: number
-        used: number
-    } => {
-        // Skip limit if user has their own API key
-        if (hasOwnApiKey()) return { allowed: true, remaining: -1, used: 0 }
-        if (dailyTokenLimit <= 0)
-            return { allowed: true, remaining: -1, used: 0 }
-
-        const today = new Date().toDateString()
-        const storedDate = localStorage.getItem(STORAGE_TOKEN_DATE_KEY)
-        let count = parseInt(
-            localStorage.getItem(STORAGE_TOKEN_COUNT_KEY) || "0",
-            10,
-        )
-
-        // Guard against NaN (e.g., if "NaN" was stored)
-        if (Number.isNaN(count)) count = 0
-
-        if (storedDate !== today) {
-            count = 0
-            localStorage.setItem(STORAGE_TOKEN_DATE_KEY, today)
-            localStorage.setItem(STORAGE_TOKEN_COUNT_KEY, "0")
-        }
-
-        return {
-            allowed: count < dailyTokenLimit,
-            remaining: dailyTokenLimit - count,
-            used: count,
-        }
-    }, [dailyTokenLimit, hasOwnApiKey])
-
-    // Helper to increment token count
-    const incrementTokenCount = useCallback((tokens: number): void => {
-        // Guard against NaN tokens
-        if (!Number.isFinite(tokens) || tokens <= 0) return
-
-        let count = parseInt(
-            localStorage.getItem(STORAGE_TOKEN_COUNT_KEY) || "0",
-            10,
-        )
-        // Guard against NaN count
-        if (Number.isNaN(count)) count = 0
-
-        localStorage.setItem(STORAGE_TOKEN_COUNT_KEY, String(count + tokens))
-    }, [])
-
-    // Helper to show token limit toast
-    const showTokenLimitToast = useCallback(
-        (used: number) => {
-            toast.custom(
-                (t) => (
-                    <QuotaLimitToast
-                        type="token"
-                        used={used}
-                        limit={dailyTokenLimit}
-                        onDismiss={() => toast.dismiss(t)}
-                    />
-                ),
-                { duration: 15000 },
-            )
-        },
-        [dailyTokenLimit],
-    )
-
-    // Helper to check TPM (tokens per minute) limit
-    // Note: This only READS, doesn't write. incrementTPMCount handles writes.
-    const checkTPMLimit = useCallback((): {
-        allowed: boolean
-        remaining: number
-        used: number
-    } => {
-        // Skip limit if user has their own API key
-        if (hasOwnApiKey()) return { allowed: true, remaining: -1, used: 0 }
-        if (tpmLimit <= 0) return { allowed: true, remaining: -1, used: 0 }
-
-        const currentMinute = Math.floor(Date.now() / 60000).toString()
-        const storedMinute = localStorage.getItem(STORAGE_TPM_MINUTE_KEY)
-        let count = parseInt(
-            localStorage.getItem(STORAGE_TPM_COUNT_KEY) || "0",
-            10,
-        )
-
-        // Guard against NaN
-        if (Number.isNaN(count)) count = 0
-
-        // If we're in a new minute, treat count as 0 (will be reset on next increment)
-        if (storedMinute !== currentMinute) {
-            count = 0
-        }
-
-        return {
-            allowed: count < tpmLimit,
-            remaining: tpmLimit - count,
-            used: count,
-        }
-    }, [tpmLimit, hasOwnApiKey])
-
-    // Helper to increment TPM count
-    const incrementTPMCount = useCallback((tokens: number): void => {
-        // Guard against NaN tokens
-        if (!Number.isFinite(tokens) || tokens <= 0) return
-
-        const currentMinute = Math.floor(Date.now() / 60000).toString()
-        const storedMinute = localStorage.getItem(STORAGE_TPM_MINUTE_KEY)
-        let count = parseInt(
-            localStorage.getItem(STORAGE_TPM_COUNT_KEY) || "0",
-            10,
-        )
-
-        // Guard against NaN
-        if (Number.isNaN(count)) count = 0
-
-        // Reset if we're in a new minute
-        if (storedMinute !== currentMinute) {
-            count = 0
-            localStorage.setItem(STORAGE_TPM_MINUTE_KEY, currentMinute)
-        }
-
-        localStorage.setItem(STORAGE_TPM_COUNT_KEY, String(count + tokens))
-    }, [])
-
-    // Helper to show TPM limit toast
-    const showTPMLimitToast = useCallback(() => {
-        const limitDisplay =
-            tpmLimit >= 1000 ? `${tpmLimit / 1000}k` : String(tpmLimit)
-        toast.error(
-            `Rate limit reached (${limitDisplay} tokens/min). Please wait 60 seconds before sending another request.`,
-            { duration: 8000 },
-        )
-    }, [tpmLimit])
+    // Quota management using extracted hook
+    const quotaManager = useQuotaManager({
+        dailyRequestLimit,
+        dailyTokenLimit,
+        tpmLimit,
+    })
 
     // Generate a unique session ID for Langfuse tracing (restore from localStorage if available)
     const [sessionId, setSessionId] = useState(() => {
@@ -432,6 +192,25 @@ export default function ChatPanel({
     // Ref to hold stop function for use in onToolCall (avoids stale closure)
     const stopRef = useRef<(() => void) | null>(null)
 
+    // Ref to track consecutive auto-retry count (reset on user action)
+    const autoRetryCountRef = useRef(0)
+
+    // Ref to accumulate partial XML when output is truncated due to maxOutputTokens
+    // When partialXmlRef.current.length > 0, we're in continuation mode
+    const partialXmlRef = useRef<string>("")
+
+    // Persist processed tool call IDs so collapsing the chat doesn't replay old tool outputs
+    const processedToolCallsRef = useRef<Set<string>>(new Set())
+
+    // Debounce timeout for localStorage writes (prevents blocking during streaming)
+    const localStorageDebounceRef = useRef<ReturnType<
+        typeof setTimeout
+    > | null>(null)
+    const xmlStorageDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+        null,
+    )
+    const LOCAL_STORAGE_DEBOUNCE_MS = 1000 // Save at most once per second
+
     const {
         messages,
         sendMessage,
@@ -445,18 +224,6 @@ export default function ChatPanel({
             api: "/api/chat",
         }),
         async onToolCall({ toolCall }) {
-            // Check if generation has been stopped
-            if (isManuallyStopped || !stopRef.current) {
-                console.log(
-                    "[onToolCall] Generation stopped, skipping tool execution",
-                    {
-                        isManuallyStopped,
-                        hasStopRef: !!stopRef.current,
-                    },
-                )
-                return
-            }
-
             if (DEBUG) {
                 console.log(
                     `[onToolCall] Tool: ${toolCall.toolName}, CallId: ${toolCall.toolCallId}`,
@@ -465,14 +232,50 @@ export default function ChatPanel({
 
             if (toolCall.toolName === "display_diagram") {
                 const { xml } = toolCall.input as { xml: string }
-                if (DEBUG) {
-                    console.log(
-                        `[display_diagram] Received XML length: ${xml.length}`,
-                    )
+
+                // DEBUG: Log raw input to diagnose false truncation detection
+                console.log(
+                    "[display_diagram] XML ending (last 100 chars):",
+                    xml.slice(-100),
+                )
+                console.log("[display_diagram] XML length:", xml.length)
+
+                // Check if XML is truncated (incomplete mxCell indicates truncated output)
+                const isTruncated = !isMxCellXmlComplete(xml)
+                console.log("[display_diagram] isTruncated:", isTruncated)
+
+                if (isTruncated) {
+                    // Store the partial XML for continuation via append_diagram
+                    partialXmlRef.current = xml
+
+                    // Tell LLM to use append_diagram to continue
+                    const partialEnding = partialXmlRef.current.slice(-500)
+                    addToolOutput({
+                        tool: "display_diagram",
+                        toolCallId: toolCall.toolCallId,
+                        state: "output-error",
+                        errorText: `Output was truncated due to length limits. Use the append_diagram tool to continue.
+
+Your output ended with:
+\`\`\`
+${partialEnding}
+\`\`\`
+
+NEXT STEP: Call append_diagram with the continuation XML.
+- Do NOT include wrapper tags or root cells (id="0", id="1")
+- Start from EXACTLY where you stopped
+- Complete all remaining mxCell elements`,
+                    })
+                    return
                 }
 
+                // Complete XML received - use it directly
+                // (continuation is now handled via append_diagram tool)
+                const finalXml = xml
+                partialXmlRef.current = "" // Reset any partial from previous truncation
+
                 // Wrap raw XML with full mxfile structure for draw.io
-                const fullXml = wrapWithMxFile(xml)
+                const fullXml = wrapWithMxFile(finalXml)
 
                 // loadDiagram validates and returns error if invalid
                 const validationError = onDisplayChart(fullXml)
@@ -483,14 +286,6 @@ export default function ChatPanel({
                         validationError,
                     )
                     // Return error to model - sendAutomaticallyWhen will trigger retry
-                    const errorMessage = `${validationError}
-
-Please fix the XML issues and call display_diagram again with corrected XML.
-
-Your failed XML:
-\`\`\`xml
-${xml}
-\`\`\``
                     if (DEBUG) {
                         console.log(
                             "[display_diagram] Adding tool output with state: output-error",
@@ -500,7 +295,14 @@ ${xml}
                         tool: "display_diagram",
                         toolCallId: toolCall.toolCallId,
                         state: "output-error",
-                        errorText: errorMessage,
+                        errorText: `${validationError}
+
+Please fix the XML issues and call display_diagram again with corrected XML.
+
+Your failed XML:
+\`\`\`xml
+${finalXml}
+\`\`\``,
                     })
                 } else {
                     // Success - diagram will be rendered by chat-message-display
@@ -521,37 +323,55 @@ ${xml}
                     }
                 }
             } else if (toolCall.toolName === "edit_diagram") {
-                const { edits } = toolCall.input as {
-                    edits: Array<{ search: string; replace: string }>
+                const { operations } = toolCall.input as {
+                    operations: Array<{
+                        type: "update" | "add" | "delete"
+                        cell_id: string
+                        new_xml?: string
+                    }>
                 }
 
                 let currentXml = ""
                 try {
-                    console.log("[edit_diagram] Starting...")
                     // Use chartXML from ref directly - more reliable than export
-                    // especially on Vercel where DrawIO iframe may have latency issues
-                    // Using ref to avoid stale closure in callback
                     const cachedXML = chartXMLRef.current
                     if (cachedXML) {
                         currentXml = cachedXML
-                        console.log(
-                            "[edit_diagram] Using cached chartXML, length:",
-                            currentXml.length,
-                        )
                     } else {
                         // Fallback to export only if no cached XML
-                        console.log(
-                            "[edit_diagram] No cached XML, fetching from DrawIO...",
-                        )
                         currentXml = await onFetchChart(false)
-                        console.log(
-                            "[edit_diagram] Got XML from export, length:",
-                            currentXml.length,
-                        )
                     }
 
-                    const { replaceXMLParts } = await import("@/lib/utils")
-                    const editedXml = replaceXMLParts(currentXml, edits)
+                    const { applyDiagramOperations } = await import(
+                        "@/lib/utils"
+                    )
+                    const { result: editedXml, errors } =
+                        applyDiagramOperations(currentXml, operations)
+
+                    // Check for operation errors
+                    if (errors.length > 0) {
+                        const errorMessages = errors
+                            .map(
+                                (e) =>
+                                    `- ${e.type} on cell_id="${e.cellId}": ${e.message}`,
+                            )
+                            .join("\n")
+
+                        addToolOutput({
+                            tool: "edit_diagram",
+                            toolCallId: toolCall.toolCallId,
+                            state: "output-error",
+                            errorText: `Some operations failed:\n${errorMessages}
+
+Current diagram XML:
+\`\`\`xml
+${currentXml}
+\`\`\`
+
+Please check the cell IDs and retry.`,
+                        })
+                        return
+                    }
 
                     // loadDiagram validates and returns error if invalid
                     const validationError = onDisplayChart(editedXml)
@@ -571,36 +391,22 @@ Current diagram XML:
 ${currentXml}
 \`\`\`
 
-Please fix the edit to avoid structural issues (e.g., duplicate IDs, invalid references).`,
+Please fix the operations to avoid structural issues.`,
                         })
                         return
                     }
-
-                    // Update the chartXML ref immediately with the edited XML
-                    chartXMLRef.current = editedXml
-
-                    // Force a short delay to ensure DrawIO has time to process the new XML
-                    await new Promise((resolve) => setTimeout(resolve, 100))
-
-                    // Export to sync with DrawIO and update context
                     onExport()
-
                     addToolOutput({
                         tool: "edit_diagram",
                         toolCallId: toolCall.toolCallId,
-                        output: `Successfully applied ${edits.length} edit(s) to the diagram.`,
+                        output: `Successfully applied ${operations.length} operation(s) to the diagram.`,
                     })
-                    console.log(
-                        "[edit_diagram] Success - diagram updated, XML length:",
-                        editedXml.length,
-                    )
                 } catch (error) {
                     console.error("[edit_diagram] Failed:", error)
 
                     const errorMessage =
                         error instanceof Error ? error.message : String(error)
 
-                    // Use addToolOutput with state: 'output-error' for proper error signaling
                     addToolOutput({
                         tool: "edit_diagram",
                         toolCallId: toolCall.toolCallId,
@@ -612,7 +418,88 @@ Current diagram XML:
 ${currentXml || "No XML available"}
 \`\`\`
 
-Please retry with an adjusted search pattern or use display_diagram if retries are exhausted.`,
+Please check cell IDs and retry, or use display_diagram to regenerate.`,
+                    })
+                }
+            } else if (toolCall.toolName === "append_diagram") {
+                const { xml } = toolCall.input as { xml: string }
+
+                // Detect if LLM incorrectly started fresh instead of continuing
+                // LLM should only output bare mxCells now, so wrapper tags indicate error
+                const trimmed = xml.trim()
+                const isFreshStart =
+                    trimmed.startsWith("<mxGraphModel") ||
+                    trimmed.startsWith("<root") ||
+                    trimmed.startsWith("<mxfile") ||
+                    trimmed.startsWith('<mxCell id="0"') ||
+                    trimmed.startsWith('<mxCell id="1"')
+
+                if (isFreshStart) {
+                    addToolOutput({
+                        tool: "append_diagram",
+                        toolCallId: toolCall.toolCallId,
+                        state: "output-error",
+                        errorText: `ERROR: You started fresh with wrapper tags. Do NOT include wrapper tags or root cells (id="0", id="1").
+
+Continue from EXACTLY where the partial ended:
+\`\`\`
+${partialXmlRef.current.slice(-500)}
+\`\`\`
+
+Start your continuation with the NEXT character after where it stopped.`,
+                    })
+                    return
+                }
+
+                // Append to accumulated XML
+                partialXmlRef.current += xml
+
+                // Check if XML is now complete (last mxCell is complete)
+                const isComplete = isMxCellXmlComplete(partialXmlRef.current)
+
+                if (isComplete) {
+                    // Wrap and display the complete diagram
+                    const finalXml = partialXmlRef.current
+                    partialXmlRef.current = "" // Reset
+
+                    const fullXml = wrapWithMxFile(finalXml)
+                    const validationError = onDisplayChart(fullXml)
+
+                    if (validationError) {
+                        addToolOutput({
+                            tool: "append_diagram",
+                            toolCallId: toolCall.toolCallId,
+                            state: "output-error",
+                            errorText: `Validation error after assembly: ${validationError}
+
+Assembled XML:
+\`\`\`xml
+${finalXml.substring(0, 2000)}...
+\`\`\`
+
+Please use display_diagram with corrected XML.`,
+                        })
+                    } else {
+                        addToolOutput({
+                            tool: "append_diagram",
+                            toolCallId: toolCall.toolCallId,
+                            output: "Diagram assembly complete and displayed successfully.",
+                        })
+                    }
+                } else {
+                    // Still incomplete - signal to continue
+                    addToolOutput({
+                        tool: "append_diagram",
+                        toolCallId: toolCall.toolCallId,
+                        state: "output-error",
+                        errorText: `XML still incomplete (mxCell not closed). Call append_diagram again to continue.
+
+Current ending:
+\`\`\`
+${partialXmlRef.current.slice(-500)}
+\`\`\`
+
+Continue from EXACTLY where you stopped.`,
                     })
                 }
             }
@@ -633,31 +520,27 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                 friendlyMessage = "Network error. Please check your connection."
             }
 
+            // Truncated tool input error (model output limit too low)
+            if (friendlyMessage.includes("toolUse.input is invalid")) {
+                friendlyMessage =
+                    "Output was truncated before the diagram could be generated. Try a simpler request or increase the maxOutputLength."
+            }
+
             // Translate image not supported error
             if (friendlyMessage.includes("image content block")) {
                 friendlyMessage = "This model doesn't support image input."
             }
 
-            // Only add system message for persistent errors (not temporary ones)
-            const isTemporaryError =
-                friendlyMessage.includes("Network error") ||
-                friendlyMessage.includes("connection") ||
-                friendlyMessage.includes("timeout") ||
-                friendlyMessage.includes("rate limit")
-
-            if (!isTemporaryError) {
-                setMessages((currentMessages) => {
-                    const errorMessage = {
-                        id: `error-${Date.now()}`,
-                        role: "system" as const,
-                        content: friendlyMessage,
-                        parts: [
-                            { type: "text" as const, text: friendlyMessage },
-                        ],
-                    }
-                    return [...currentMessages, errorMessage]
-                })
-            }
+            // Add system message for error so it can be cleared
+            setMessages((currentMessages) => {
+                const errorMessage = {
+                    id: `error-${Date.now()}`,
+                    role: "system" as const,
+                    content: friendlyMessage,
+                    parts: [{ type: "text" as const, text: friendlyMessage }],
+                }
+                return [...currentMessages, errorMessage]
+            })
 
             if (error.message.includes("Invalid or missing access code")) {
                 // Show settings button and open dialog to help user fix it
@@ -670,6 +553,11 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
             const metadata = message?.metadata as
                 | Record<string, unknown>
                 | undefined
+
+            // DEBUG: Log finish reason to diagnose truncation
+            console.log("[onFinish] finishReason:", metadata?.finishReason)
+            console.log("[onFinish] metadata:", metadata)
+
             if (metadata) {
                 // Use Number.isFinite to guard against NaN (typeof NaN === 'number' is true)
                 const inputTokens = Number.isFinite(metadata.inputTokens)
@@ -680,13 +568,63 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                     : 0
                 const actualTokens = inputTokens + outputTokens
                 if (actualTokens > 0) {
-                    incrementTokenCount(actualTokens)
-                    incrementTPMCount(actualTokens)
+                    quotaManager.incrementTokenCount(actualTokens)
+                    quotaManager.incrementTPMCount(actualTokens)
                 }
             }
         },
-        sendAutomaticallyWhen: ({ messages }) =>
-            shouldAutoResubmit(messages as unknown as ChatMessage[]),
+        sendAutomaticallyWhen: ({ messages }) => {
+            const isInContinuationMode = partialXmlRef.current.length > 0
+
+            const shouldRetry = hasToolErrors(
+                messages as unknown as ChatMessage[],
+            )
+
+            if (!shouldRetry) {
+                // No error, reset retry count and clear state
+                autoRetryCountRef.current = 0
+                partialXmlRef.current = ""
+                return false
+            }
+
+            // Continuation mode: unlimited retries (truncation continuation, not real errors)
+            // Server limits to 5 steps via stepCountIs(5)
+            if (isInContinuationMode) {
+                // Don't count against retry limit for continuation
+                // Quota checks still apply below
+            } else {
+                // Regular error: check retry count limit
+                if (autoRetryCountRef.current >= MAX_AUTO_RETRY_COUNT) {
+                    toast.error(
+                        `Auto-retry limit reached (${MAX_AUTO_RETRY_COUNT}). Please try again manually.`,
+                    )
+                    autoRetryCountRef.current = 0
+                    partialXmlRef.current = ""
+                    return false
+                }
+                // Increment retry count for actual errors
+                autoRetryCountRef.current++
+            }
+
+            // Check quota limits before auto-retry
+            const tokenLimitCheck = quotaManager.checkTokenLimit()
+            if (!tokenLimitCheck.allowed) {
+                quotaManager.showTokenLimitToast(tokenLimitCheck.used)
+                autoRetryCountRef.current = 0
+                partialXmlRef.current = ""
+                return false
+            }
+
+            const tpmCheck = quotaManager.checkTPMLimit()
+            if (!tpmCheck.allowed) {
+                quotaManager.showTPMLimitToast()
+                autoRetryCountRef.current = 0
+                partialXmlRef.current = ""
+                return false
+            }
+
+            return true
+        },
     })
 
     // Update stopRef so onToolCall can access it
@@ -697,13 +635,6 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
     useEffect(() => {
         messagesRef.current = messages
     }, [messages])
-
-    // Debug: Monitor status changes in development
-    useEffect(() => {
-        if (DEBUG) {
-            console.log("[ChatPanel] Status changed to:", status)
-        }
-    }, [status])
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -732,6 +663,10 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
             }
         } catch (error) {
             console.error("Failed to restore from localStorage:", error)
+            // On complete failure, clear storage to allow recovery
+            localStorage.removeItem(STORAGE_MESSAGES_KEY)
+            localStorage.removeItem(STORAGE_XML_SNAPSHOTS_KEY)
+            toast.error("Session data was corrupted. Starting fresh.")
         }
     }, [setMessages])
 
@@ -776,32 +711,71 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
         }, 500)
     }, [isDrawioReady, onDisplayChart])
 
-    // Save messages to localStorage whenever they change
+    // Save messages to localStorage whenever they change (debounced to prevent blocking during streaming)
     useEffect(() => {
         if (!hasRestoredRef.current) return
-        try {
-            localStorage.setItem(STORAGE_MESSAGES_KEY, JSON.stringify(messages))
-        } catch (error) {
-            console.error("Failed to save messages to localStorage:", error)
+
+        // Clear any pending save
+        if (localStorageDebounceRef.current) {
+            clearTimeout(localStorageDebounceRef.current)
+        }
+
+        // Debounce: save after 1 second of no changes
+        localStorageDebounceRef.current = setTimeout(() => {
+            try {
+                console.time("perf:localStorage-messages")
+                localStorage.setItem(
+                    STORAGE_MESSAGES_KEY,
+                    JSON.stringify(messages),
+                )
+                console.timeEnd("perf:localStorage-messages")
+            } catch (error) {
+                console.error("Failed to save messages to localStorage:", error)
+            }
+        }, LOCAL_STORAGE_DEBOUNCE_MS)
+
+        // Cleanup on unmount
+        return () => {
+            if (localStorageDebounceRef.current) {
+                clearTimeout(localStorageDebounceRef.current)
+            }
         }
     }, [messages])
 
-    // Save diagram XML to localStorage whenever it changes
+    // Save diagram XML to localStorage whenever it changes (debounced)
     useEffect(() => {
         if (!canSaveDiagram) return
-        if (chartXML && chartXML.length > 300) {
+        if (!chartXML || chartXML.length <= 300) return
+
+        // Clear any pending save
+        if (xmlStorageDebounceRef.current) {
+            clearTimeout(xmlStorageDebounceRef.current)
+        }
+
+        // Debounce: save after 1 second of no changes
+        xmlStorageDebounceRef.current = setTimeout(() => {
+            console.time("perf:localStorage-xml")
             localStorage.setItem(STORAGE_DIAGRAM_XML_KEY, chartXML)
+            console.timeEnd("perf:localStorage-xml")
+        }, LOCAL_STORAGE_DEBOUNCE_MS)
+
+        return () => {
+            if (xmlStorageDebounceRef.current) {
+                clearTimeout(xmlStorageDebounceRef.current)
+            }
         }
     }, [chartXML, canSaveDiagram])
 
     // Save XML snapshots to localStorage whenever they change
     const saveXmlSnapshots = useCallback(() => {
         try {
+            console.time("perf:localStorage-snapshots")
             const snapshotsArray = Array.from(xmlSnapshotsRef.current.entries())
             localStorage.setItem(
                 STORAGE_XML_SNAPSHOTS_KEY,
                 JSON.stringify(snapshotsArray),
             )
+            console.timeEnd("perf:localStorage-snapshots")
         } catch (error) {
             console.error(
                 "Failed to save XML snapshots to localStorage:",
@@ -866,20 +840,11 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                     const toolCallId = `cached-${Date.now()}`
 
                     // Build user message text including any file content
-                    let userText = input
-                    for (const file of files) {
-                        if (isPdfFile(file)) {
-                            const extracted = pdfData.get(file)
-                            if (extracted?.text) {
-                                userText += `\n\n[PDF: ${file.name}]\n${extracted.text}`
-                            }
-                        } else if (isTextFile(file)) {
-                            const extracted = pdfData.get(file)
-                            if (extracted?.text) {
-                                userText += `\n\n[File: ${file.name}]\n${extracted.text}`
-                            }
-                        }
-                    }
+                    const userText = await processFilesAndAppendContent(
+                        input,
+                        files,
+                        pdfData,
+                    )
 
                     setMessages([
                         {
@@ -917,42 +882,13 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
 
                 // Build user text by concatenating input with pre-extracted text
                 // (Backend only reads first text part, so we must combine them)
-                let userText = input
                 const parts: any[] = []
-
-                if (files.length > 0) {
-                    for (const file of files) {
-                        if (isPdfFile(file)) {
-                            // Use pre-extracted PDF text from pdfData
-                            const extracted = pdfData.get(file)
-                            if (extracted?.text) {
-                                userText += `\n\n[PDF: ${file.name}]\n${extracted.text}`
-                            }
-                        } else if (isTextFile(file)) {
-                            // Use pre-extracted text file content from pdfData
-                            const extracted = pdfData.get(file)
-                            if (extracted?.text) {
-                                userText += `\n\n[File: ${file.name}]\n${extracted.text}`
-                            }
-                        } else {
-                            // Handle as image
-                            const reader = new FileReader()
-                            const dataUrl = await new Promise<string>(
-                                (resolve) => {
-                                    reader.onload = () =>
-                                        resolve(reader.result as string)
-                                    reader.readAsDataURL(file)
-                                },
-                            )
-
-                            parts.push({
-                                type: "file",
-                                url: dataUrl,
-                                mediaType: file.type,
-                            })
-                        }
-                    }
-                }
+                const userText = await processFilesAndAppendContent(
+                    input,
+                    files,
+                    pdfData,
+                    parts,
+                )
 
                 // Add the combined text as the first part
                 parts.unshift({ type: "text", text: userText })
@@ -971,56 +907,11 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                 xmlSnapshotsRef.current.set(messageIndex, chartXml)
                 saveXmlSnapshots()
 
-                // Check daily limit
-                const limitCheck = checkDailyLimit()
-                if (!limitCheck.allowed) {
-                    showQuotaLimitToast()
-                    return
-                }
+                // Check all quota limits
+                if (!checkAllQuotaLimits()) return
 
-                // Check daily token limit (actual usage tracked after response)
-                const tokenLimitCheck = checkTokenLimit()
-                if (!tokenLimitCheck.allowed) {
-                    showTokenLimitToast(tokenLimitCheck.used)
-                    return
-                }
+                sendChatMessage(parts, chartXml, previousXml, sessionId)
 
-                // Check TPM (tokens per minute) limit
-                const tpmCheck = checkTPMLimit()
-                if (!tpmCheck.allowed) {
-                    showTPMLimitToast()
-                    return
-                }
-
-                const accessCode =
-                    localStorage.getItem(STORAGE_ACCESS_CODE_KEY) || ""
-                const aiProvider =
-                    localStorage.getItem(STORAGE_AI_PROVIDER_KEY) || ""
-                const aiBaseUrl =
-                    localStorage.getItem(STORAGE_AI_BASE_URL_KEY) || ""
-                const aiApiKey =
-                    localStorage.getItem(STORAGE_AI_API_KEY_KEY) || ""
-                const aiModel = localStorage.getItem(STORAGE_AI_MODEL_KEY) || ""
-
-                sendMessage(
-                    { parts },
-                    {
-                        body: {
-                            xml: chartXml,
-                            previousXml,
-                            sessionId,
-                        },
-                        headers: {
-                            "x-access-code": accessCode,
-                            ...(aiProvider && { "x-ai-provider": aiProvider }),
-                            ...(aiBaseUrl && { "x-ai-base-url": aiBaseUrl }),
-                            ...(aiApiKey && { "x-ai-api-key": aiApiKey }),
-                            ...(aiModel && { "x-ai-model": aiModel }),
-                        },
-                    },
-                )
-
-                incrementRequestCount()
                 // Token count is tracked in onFinish with actual server usage
                 setInput("")
                 setFiles([])
@@ -1030,127 +921,163 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
         }
     }
 
+    const handleNewChat = useCallback(() => {
+        setMessages([])
+        clearDiagram()
+        handleFileChange([]) // Use handleFileChange to also clear pdfData
+        const newSessionId = `session-${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2, 9)}`
+        setSessionId(newSessionId)
+        xmlSnapshotsRef.current.clear()
+        // Clear localStorage with error handling
+        try {
+            localStorage.removeItem(STORAGE_MESSAGES_KEY)
+            localStorage.removeItem(STORAGE_XML_SNAPSHOTS_KEY)
+            localStorage.removeItem(STORAGE_DIAGRAM_XML_KEY)
+            localStorage.setItem(STORAGE_SESSION_ID_KEY, newSessionId)
+            toast.success("Started a fresh chat")
+        } catch (error) {
+            console.error("Failed to clear localStorage:", error)
+            toast.warning(
+                "Chat cleared but browser storage could not be updated",
+            )
+        }
+
+        setShowNewChatDialog(false)
+    }, [clearDiagram, handleFileChange, setMessages, setSessionId])
+
     const handleInputChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     ) => {
         setInput(e.target.value)
     }
 
-    // Enhanced stop function to properly clean up state
-    const handleStop = () => {
-        if (DEBUG) {
-            console.log(
-                "[ChatPanel] Stop button clicked, stopping AI generation",
-            )
-        }
-
-        // Set stopped flag immediately to update UI
-        setIsManuallyStopped(true)
-
-        try {
-            // Call AI SDK's stop function
-            stop()
-
-            // Force clear any pending tool executions
-            stopRef.current = null
-
-            if (DEBUG) {
-                console.log("[ChatPanel] Stop function called successfully")
-            }
-        } catch (error) {
-            console.error("[ChatPanel] Error calling stop function:", error)
-        }
-
-        // Force UI to reflect stopped state by clearing input and files
-        setInput("")
-        setFiles([])
-
-        // Reset stopped flag after a delay to allow new requests
-        setTimeout(() => {
-            setIsManuallyStopped(false)
-            if (DEBUG) {
-                console.log(
-                    "[ChatPanel] Reset stopped flag, ready for new requests",
-                )
-            }
-        }, 1000)
+    // Helper functions for message actions (regenerate/edit)
+    // Extract previous XML snapshot before a given message index
+    const getPreviousXml = (beforeIndex: number): string => {
+        const snapshotKeys = Array.from(xmlSnapshotsRef.current.keys())
+            .filter((k) => k < beforeIndex)
+            .sort((a, b) => b - a)
+        return snapshotKeys.length > 0
+            ? xmlSnapshotsRef.current.get(snapshotKeys[0]) || ""
+            : ""
     }
 
-    const handleFileChange = async (newFiles: File[]) => {
-        setFiles(newFiles)
+    // Restore diagram from snapshot and update ref
+    const restoreDiagramFromSnapshot = (savedXml: string) => {
+        onDisplayChart(savedXml, true) // Skip validation for trusted snapshots
+        chartXMLRef.current = savedXml
+    }
 
-        // Extract text immediately for new PDF/text files
-        for (const file of newFiles) {
-            const needsExtraction =
-                (isPdfFile(file) || isTextFile(file)) && !pdfData.has(file)
-            if (needsExtraction) {
-                // Mark as extracting
-                setPdfData((prev) => {
-                    const next = new Map(prev)
-                    next.set(file, {
-                        text: "",
-                        charCount: 0,
-                        isExtracting: true,
-                    })
-                    return next
+    // Clean up snapshots after a given message index
+    const cleanupSnapshotsAfter = (messageIndex: number) => {
+        for (const key of xmlSnapshotsRef.current.keys()) {
+            if (key > messageIndex) {
+                xmlSnapshotsRef.current.delete(key)
+            }
+        }
+        saveXmlSnapshots()
+    }
+
+    // Check all quota limits (daily requests, tokens, TPM)
+    const checkAllQuotaLimits = (): boolean => {
+        const limitCheck = quotaManager.checkDailyLimit()
+        if (!limitCheck.allowed) {
+            quotaManager.showQuotaLimitToast()
+            return false
+        }
+
+        const tokenLimitCheck = quotaManager.checkTokenLimit()
+        if (!tokenLimitCheck.allowed) {
+            quotaManager.showTokenLimitToast(tokenLimitCheck.used)
+            return false
+        }
+
+        const tpmCheck = quotaManager.checkTPMLimit()
+        if (!tpmCheck.allowed) {
+            quotaManager.showTPMLimitToast()
+            return false
+        }
+
+        return true
+    }
+
+    // Send chat message with headers and increment quota
+    const sendChatMessage = (
+        parts: any,
+        xml: string,
+        previousXml: string,
+        sessionId: string,
+    ) => {
+        // Reset all retry/continuation state on user-initiated message
+        autoRetryCountRef.current = 0
+        partialXmlRef.current = ""
+
+        const config = getAIConfig()
+
+        sendMessage(
+            { parts },
+            {
+                body: { xml, previousXml, sessionId },
+                headers: {
+                    "x-access-code": config.accessCode,
+                    ...(config.aiProvider && {
+                        "x-ai-provider": config.aiProvider,
+                        ...(config.aiBaseUrl && {
+                            "x-ai-base-url": config.aiBaseUrl,
+                        }),
+                        ...(config.aiApiKey && {
+                            "x-ai-api-key": config.aiApiKey,
+                        }),
+                        ...(config.aiModel && { "x-ai-model": config.aiModel }),
+                    }),
+                    ...(minimalStyle && {
+                        "x-minimal-style": "true",
+                    }),
+                },
+            },
+        )
+        quotaManager.incrementRequestCount()
+    }
+
+    // Process files and append content to user text (handles PDF, text, and optionally images)
+    const processFilesAndAppendContent = async (
+        baseText: string,
+        files: File[],
+        pdfData: Map<File, FileData>,
+        imageParts?: any[],
+    ): Promise<string> => {
+        let userText = baseText
+
+        for (const file of files) {
+            if (isPdfFile(file)) {
+                const extracted = pdfData.get(file)
+                if (extracted?.text) {
+                    userText += `\n\n[PDF: ${file.name}]\n${extracted.text}`
+                }
+            } else if (isTextFile(file)) {
+                const extracted = pdfData.get(file)
+                if (extracted?.text) {
+                    userText += `\n\n[File: ${file.name}]\n${extracted.text}`
+                }
+            } else if (imageParts) {
+                // Handle as image (only if imageParts array provided)
+                const reader = new FileReader()
+                const dataUrl = await new Promise<string>((resolve) => {
+                    reader.onload = () => resolve(reader.result as string)
+                    reader.readAsDataURL(file)
                 })
 
-                // Extract text asynchronously
-                try {
-                    let text: string
-                    if (isPdfFile(file)) {
-                        text = await extractPdfText(file)
-                    } else {
-                        text = await extractTextFileContent(file)
-                    }
-
-                    // Check character limit
-                    if (text.length > MAX_EXTRACTED_CHARS) {
-                        const limitK = MAX_EXTRACTED_CHARS / 1000
-                        toast.error(
-                            `${file.name}: Content exceeds ${limitK}k character limit (${(text.length / 1000).toFixed(1)}k chars)`,
-                        )
-                        setPdfData((prev) => {
-                            const next = new Map(prev)
-                            next.delete(file)
-                            return next
-                        })
-                        // Remove the file from the list
-                        setFiles((prev) => prev.filter((f) => f !== file))
-                        continue
-                    }
-
-                    setPdfData((prev) => {
-                        const next = new Map(prev)
-                        next.set(file, {
-                            text,
-                            charCount: text.length,
-                            isExtracting: false,
-                        })
-                        return next
-                    })
-                } catch (error) {
-                    console.error("Failed to extract text:", error)
-                    toast.error(`Failed to read file: ${file.name}`)
-                    setPdfData((prev) => {
-                        const next = new Map(prev)
-                        next.delete(file)
-                        return next
-                    })
-                }
+                imageParts.push({
+                    type: "file",
+                    url: dataUrl,
+                    mediaType: file.type,
+                })
             }
         }
 
-        // Clean up pdfData for removed files
-        setPdfData((prev) => {
-            const next = new Map(prev)
-            for (const key of prev.keys()) {
-                if (!newFiles.includes(key)) {
-                    next.delete(key)
-                }
-            }
-            return next
-        })
+        return userText
     }
 
     const handleRegenerate = async (messageIndex: number) => {
@@ -1185,28 +1112,12 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
             return
         }
 
-        // Get previous XML (snapshot before the one being regenerated)
-        const snapshotKeys = Array.from(xmlSnapshotsRef.current.keys())
-            .filter((k) => k < userMessageIndex)
-            .sort((a, b) => b - a)
-        const previousXml =
-            snapshotKeys.length > 0
-                ? xmlSnapshotsRef.current.get(snapshotKeys[0]) || ""
-                : ""
-
-        // Restore the diagram to the saved state (skip validation for trusted snapshots)
-        onDisplayChart(savedXml, true)
-
-        // Update ref directly to ensure edit_diagram has the correct XML
-        chartXMLRef.current = savedXml
+        // Get previous XML and restore diagram state
+        const previousXml = getPreviousXml(userMessageIndex)
+        restoreDiagramFromSnapshot(savedXml)
 
         // Clean up snapshots for messages after the user message (they will be removed)
-        for (const key of xmlSnapshotsRef.current.keys()) {
-            if (key > userMessageIndex) {
-                xmlSnapshotsRef.current.delete(key)
-            }
-        }
-        saveXmlSnapshots()
+        cleanupSnapshotsAfter(userMessageIndex)
 
         // Remove the user message AND assistant message onwards (sendMessage will re-add the user message)
         // Use flushSync to ensure state update is processed synchronously before sending
@@ -1215,53 +1126,12 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
             setMessages(newMessages)
         })
 
-        // Check daily limit
-        const limitCheck = checkDailyLimit()
-        if (!limitCheck.allowed) {
-            showQuotaLimitToast()
-            return
-        }
-
-        // Check daily token limit (actual usage tracked after response)
-        const tokenLimitCheck = checkTokenLimit()
-        if (!tokenLimitCheck.allowed) {
-            showTokenLimitToast(tokenLimitCheck.used)
-            return
-        }
-
-        // Check TPM (tokens per minute) limit
-        const tpmCheck = checkTPMLimit()
-        if (!tpmCheck.allowed) {
-            showTPMLimitToast()
-            return
-        }
+        // Check all quota limits
+        if (!checkAllQuotaLimits()) return
 
         // Now send the message after state is guaranteed to be updated
-        const accessCode = localStorage.getItem(STORAGE_ACCESS_CODE_KEY) || ""
-        const aiProvider = localStorage.getItem(STORAGE_AI_PROVIDER_KEY) || ""
-        const aiBaseUrl = localStorage.getItem(STORAGE_AI_BASE_URL_KEY) || ""
-        const aiApiKey = localStorage.getItem(STORAGE_AI_API_KEY_KEY) || ""
-        const aiModel = localStorage.getItem(STORAGE_AI_MODEL_KEY) || ""
+        sendChatMessage(userParts, savedXml, previousXml, sessionId)
 
-        sendMessage(
-            { parts: userParts },
-            {
-                body: {
-                    xml: savedXml,
-                    previousXml,
-                    sessionId,
-                },
-                headers: {
-                    "x-access-code": accessCode,
-                    ...(aiProvider && { "x-ai-provider": aiProvider }),
-                    ...(aiBaseUrl && { "x-ai-base-url": aiBaseUrl }),
-                    ...(aiApiKey && { "x-ai-api-key": aiApiKey }),
-                    ...(aiModel && { "x-ai-model": aiModel }),
-                },
-            },
-        )
-
-        incrementRequestCount()
         // Token count is tracked in onFinish with actual server usage
     }
 
@@ -1282,28 +1152,12 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
             return
         }
 
-        // Get previous XML (snapshot before the one being edited)
-        const snapshotKeys = Array.from(xmlSnapshotsRef.current.keys())
-            .filter((k) => k < messageIndex)
-            .sort((a, b) => b - a)
-        const previousXml =
-            snapshotKeys.length > 0
-                ? xmlSnapshotsRef.current.get(snapshotKeys[0]) || ""
-                : ""
-
-        // Restore the diagram to the saved state (skip validation for trusted snapshots)
-        onDisplayChart(savedXml, true)
-
-        // Update ref directly to ensure edit_diagram has the correct XML
-        chartXMLRef.current = savedXml
+        // Get previous XML and restore diagram state
+        const previousXml = getPreviousXml(messageIndex)
+        restoreDiagramFromSnapshot(savedXml)
 
         // Clean up snapshots for messages after the user message (they will be removed)
-        for (const key of xmlSnapshotsRef.current.keys()) {
-            if (key > messageIndex) {
-                xmlSnapshotsRef.current.delete(key)
-            }
-        }
-        saveXmlSnapshots()
+        cleanupSnapshotsAfter(messageIndex)
 
         // Create new parts with updated text
         const newParts = message.parts?.map((part: any) => {
@@ -1320,53 +1174,11 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
             setMessages(newMessages)
         })
 
-        // Check daily limit
-        const limitCheck = checkDailyLimit()
-        if (!limitCheck.allowed) {
-            showQuotaLimitToast()
-            return
-        }
-
-        // Check daily token limit (actual usage tracked after response)
-        const tokenLimitCheck = checkTokenLimit()
-        if (!tokenLimitCheck.allowed) {
-            showTokenLimitToast(tokenLimitCheck.used)
-            return
-        }
-
-        // Check TPM (tokens per minute) limit
-        const tpmCheck = checkTPMLimit()
-        if (!tpmCheck.allowed) {
-            showTPMLimitToast()
-            return
-        }
+        // Check all quota limits
+        if (!checkAllQuotaLimits()) return
 
         // Now send the edited message after state is guaranteed to be updated
-        const accessCode = localStorage.getItem(STORAGE_ACCESS_CODE_KEY) || ""
-        const aiProvider = localStorage.getItem(STORAGE_AI_PROVIDER_KEY) || ""
-        const aiBaseUrl = localStorage.getItem(STORAGE_AI_BASE_URL_KEY) || ""
-        const aiApiKey = localStorage.getItem(STORAGE_AI_API_KEY_KEY) || ""
-        const aiModel = localStorage.getItem(STORAGE_AI_MODEL_KEY) || ""
-
-        sendMessage(
-            { parts: newParts },
-            {
-                body: {
-                    xml: savedXml,
-                    previousXml,
-                    sessionId,
-                },
-                headers: {
-                    "x-access-code": accessCode,
-                    ...(aiProvider && { "x-ai-provider": aiProvider }),
-                    ...(aiBaseUrl && { "x-ai-base-url": aiBaseUrl }),
-                    ...(aiApiKey && { "x-ai-api-key": aiApiKey }),
-                    ...(aiModel && { "x-ai-model": aiModel }),
-                },
-            },
-        )
-
-        incrementRequestCount()
+        sendChatMessage(newParts, savedXml, previousXml, sessionId)
         // Token count is tracked in onFinish with actual server usage
     }
 
@@ -1375,7 +1187,7 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
         return (
             <div className="h-full flex flex-col items-center pt-4 bg-card border border-border/30 rounded-xl">
                 <ButtonWithTooltip
-                    tooltipContent="显示聊天面板 (Ctrl+B)"
+                    tooltipContent="Show chat panel (Ctrl+B)"
                     variant="ghost"
                     size="icon"
                     onClick={onToggleVisibility}
@@ -1390,7 +1202,7 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                         transform: "rotate(180deg)",
                     }}
                 >
-                    AI 聊天
+                    AI Chat
                 </div>
             </div>
         )
@@ -1408,6 +1220,7 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                     style: {
                         maxWidth: "480px",
                     },
+                    duration: 2000,
                 }}
             />
             {/* Header */}
@@ -1427,7 +1240,7 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                             <h1
                                 className={`${isMobile ? "text-sm" : "text-base"} font-semibold tracking-tight whitespace-nowrap`}
                             >
-                                Next AI 流程图
+                                Next AI Drawio
                             </h1>
                         </div>
                         {!isMobile && (
@@ -1437,7 +1250,7 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                                 rel="noopener noreferrer"
                                 className="text-sm text-muted-foreground hover:text-foreground transition-colors ml-2"
                             >
-                                关于
+                                About
                             </Link>
                         )}
                         {!isMobile && (
@@ -1447,7 +1260,7 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                                 rel="noopener noreferrer"
                             >
                                 <ButtonWithTooltip
-                                    tooltipContent="由于使用量较高，我已将模型更改为 minimax-m2 并添加了一些使用限制。详见关于页面。"
+                                    tooltipContent="Due to high usage, I have changed the model to minimax-m2 and added some usage limits. See About page for details."
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-6 text-amber-500 hover:text-amber-600"
@@ -1458,8 +1271,20 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                         )}
                     </div>
                     <div className="flex items-center gap-1">
+                        <ButtonWithTooltip
+                            tooltipContent="Start fresh chat"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowNewChatDialog(true)}
+                            className="hover:bg-accent"
+                        >
+                            <MessageSquarePlus
+                                className={`${isMobile ? "h-4 w-4" : "h-5 w-5"} text-muted-foreground`}
+                            />
+                        </ButtonWithTooltip>
+                        <div className="w-px h-5 bg-border mx-1" />
                         <a
-                            href="https://github.com/wangfenghuan/w-next-ai-drawio"
+                            href="https://github.com/DayuanJiang/next-ai-draw-io"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -1469,7 +1294,7 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                             />
                         </a>
                         <ButtonWithTooltip
-                            tooltipContent="设置"
+                            tooltipContent="Settings"
                             variant="ghost"
                             size="icon"
                             onClick={() => setShowSettingsDialog(true)}
@@ -1481,7 +1306,7 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                         </ButtonWithTooltip>
                         {!isMobile && (
                             <ButtonWithTooltip
-                                tooltipContent="隐藏聊天面板 (Ctrl+B)"
+                                tooltipContent="Hide chat panel (Ctrl+B)"
                                 variant="ghost"
                                 size="icon"
                                 onClick={onToggleVisibility}
@@ -1500,6 +1325,7 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                     messages={messages}
                     setInput={setInput}
                     setFiles={handleFileChange}
+                    processedToolCallsRef={processedToolCallsRef}
                     sessionId={sessionId}
                     onRegenerate={handleRegenerate}
                     status={status}
@@ -1516,25 +1342,7 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                     status={status}
                     onSubmit={onFormSubmit}
                     onChange={handleInputChange}
-                    onClearChat={() => {
-                        setMessages([])
-                        clearDiagram()
-                        const newSessionId = `session-${Date.now()}-${Math.random()
-                            .toString(36)
-                            .slice(2, 9)}`
-                        setSessionId(newSessionId)
-                        xmlSnapshotsRef.current.clear()
-                        // Clear localStorage
-                        localStorage.removeItem(STORAGE_MESSAGES_KEY)
-                        localStorage.removeItem(STORAGE_XML_SNAPSHOTS_KEY)
-                        localStorage.removeItem(STORAGE_DIAGRAM_XML_KEY)
-                        localStorage.setItem(
-                            STORAGE_SESSION_ID_KEY,
-                            newSessionId,
-                        )
-                    }}
-                    onStop={handleStop}
-                    isManuallyStopped={isManuallyStopped}
+                    onClearChat={handleNewChat}
                     files={files}
                     onFileChange={handleFileChange}
                     pdfData={pdfData}
@@ -1542,6 +1350,8 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                     onToggleHistory={setShowHistory}
                     sessionId={sessionId}
                     error={error}
+                    minimalStyle={minimalStyle}
+                    onMinimalStyleChange={setMinimalStyle}
                 />
             </footer>
 
@@ -1553,6 +1363,12 @@ Please retry with an adjusted search pattern or use display_diagram if retries a
                 onToggleDrawioUi={onToggleDrawioUi}
                 darkMode={darkMode}
                 onToggleDarkMode={onToggleDarkMode}
+            />
+
+            <ResetWarningModal
+                open={showNewChatDialog}
+                onOpenChange={setShowNewChatDialog}
+                onClear={handleNewChat}
             />
         </div>
     )

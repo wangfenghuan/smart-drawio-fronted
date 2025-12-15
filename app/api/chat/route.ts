@@ -3,10 +3,12 @@ import {
     convertToModelMessages,
     createUIMessageStream,
     createUIMessageStreamResponse,
+    InvalidToolInputError,
     LoadAPIKeyError,
     stepCountIs,
     streamText,
 } from "ai"
+import { jsonrepair } from "jsonrepair"
 import { z } from "zod"
 import { getAIModel, supportsPromptCaching } from "@/lib/ai-providers"
 import { findCachedResponse } from "@/lib/cached-responses"
@@ -18,7 +20,7 @@ import {
 } from "@/lib/langfuse"
 import { getSystemPrompt } from "@/lib/system-prompts"
 
-export const maxDuration = 300
+export const maxDuration = 120
 
 // File upload limits (must match client-side)
 const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
@@ -95,35 +97,6 @@ function replaceHistoricalToolInputs(messages: any[]): any[] {
     })
 }
 
-// Helper function to fix tool call inputs for Bedrock API
-// Bedrock requires toolUse.input to be a JSON object, not a string
-function fixToolCallInputs(messages: any[]): any[] {
-    return messages.map((msg) => {
-        if (msg.role !== "assistant" || !Array.isArray(msg.content)) {
-            return msg
-        }
-        const fixedContent = msg.content.map((part: any) => {
-            if (part.type === "tool-call") {
-                if (typeof part.input === "string") {
-                    try {
-                        const parsed = JSON.parse(part.input)
-                        return { ...part, input: parsed }
-                    } catch {
-                        // If parsing fails, wrap the string in an object
-                        return { ...part, input: { rawInput: part.input } }
-                    }
-                }
-                // Input is already an object, but verify it's not null/undefined
-                if (part.input === null || part.input === undefined) {
-                    return { ...part, input: {} }
-                }
-            }
-            return part
-        })
-        return { ...msg, content: fixedContent }
-    })
-}
-
 // Helper function to create cached stream response
 function createCachedStreamResponse(xml: string): Response {
     const toolCallId = `cached-${Date.now()}`
@@ -186,9 +159,9 @@ async function handleChatRequest(req: Request): Promise<Response> {
             : undefined
 
     // Extract user input text for Langfuse trace
-    const currentMessage = messages[messages.length - 1]
+    const lastMessage = messages[messages.length - 1]
     const userInputText =
-        currentMessage?.parts?.find((p: any) => p.type === "text")?.text || ""
+        lastMessage?.parts?.find((p: any) => p.type === "text")?.text || ""
 
     // Update Langfuse trace with input, session, and user
     setTraceInput({
@@ -229,6 +202,9 @@ async function handleChatRequest(req: Request): Promise<Response> {
         modelId: req.headers.get("x-ai-model"),
     }
 
+    // Read minimal style preference from header
+    const minimalStyle = req.headers.get("x-minimal-style") === "true"
+
     // Get AI model with optional client overrides
     const { model, providerOptions, headers, modelId } =
         getAIModel(clientOverrides)
@@ -240,13 +216,7 @@ async function handleChatRequest(req: Request): Promise<Response> {
     )
 
     // Get the appropriate system prompt based on model (extended for Opus/Haiku 4.5)
-    const systemMessage = getSystemPrompt(modelId)
-
-    const lastMessage = messages[messages.length - 1]
-
-    // Extract text from the last message parts
-    const lastMessageText =
-        lastMessage.parts?.find((part: any) => part.type === "text")?.text || ""
+    const systemMessage = getSystemPrompt(modelId, minimalStyle)
 
     // Extract file parts (images) from the last message
     const fileParts =
@@ -255,17 +225,19 @@ async function handleChatRequest(req: Request): Promise<Response> {
     // User input only - XML is now in a separate cached system message
     const formattedUserInput = `User input:
 """md
-${lastMessageText}
+${userInputText}
 """`
 
     // Convert UIMessages to ModelMessages and add system message
     const modelMessages = convertToModelMessages(messages)
 
-    // Fix tool call inputs for Bedrock API (requires JSON objects, not strings)
-    const fixedMessages = fixToolCallInputs(modelMessages)
-
-    // Replace historical tool call XML with placeholders to reduce tokens and avoid confusion
-    const placeholderMessages = replaceHistoricalToolInputs(fixedMessages)
+    // Replace historical tool call XML with placeholders to reduce tokens
+    // Disabled by default - some models (e.g. minimax) copy placeholders instead of generating XML
+    const enableHistoryReplace =
+        process.env.ENABLE_HISTORY_XML_REPLACE === "true"
+    const placeholderMessages = enableHistoryReplace
+        ? replaceHistoricalToolInputs(modelMessages)
+        : modelMessages
 
     // Filter out messages with empty content arrays (Bedrock API rejects these)
     // This is a safety measure - ideally convertToModelMessages should handle all cases
@@ -349,7 +321,35 @@ ${lastMessageText}
 
     const result = streamText({
         model,
+        ...(process.env.MAX_OUTPUT_TOKENS && {
+            maxOutputTokens: parseInt(process.env.MAX_OUTPUT_TOKENS, 10),
+        }),
         stopWhen: stepCountIs(5),
+        // Repair truncated tool calls when maxOutputTokens is reached mid-JSON
+        experimental_repairToolCall: async ({ toolCall, error }) => {
+            // Only attempt repair for invalid tool input (broken JSON from truncation)
+            if (
+                error instanceof InvalidToolInputError ||
+                error.name === "AI_InvalidToolInputError"
+            ) {
+                try {
+                    // Use jsonrepair to fix truncated JSON
+                    const repairedInput = jsonrepair(toolCall.input)
+                    console.log(
+                        `[repairToolCall] Repaired truncated JSON for tool: ${toolCall.toolName}`,
+                    )
+                    return { ...toolCall, input: repairedInput }
+                } catch (repairError) {
+                    console.warn(
+                        `[repairToolCall] Failed to repair JSON for tool: ${toolCall.toolName}`,
+                        repairError,
+                    )
+                    return null
+                }
+            }
+            // Don't attempt to repair other errors (like NoSuchToolError)
+            return null
+        },
         messages: allMessages,
         ...(providerOptions && { providerOptions }), // This now includes all reasoning configs
         ...(headers && { headers }),
@@ -360,32 +360,6 @@ ${lastMessageText}
                 userId,
             }),
         }),
-        // Repair malformed tool calls (model sometimes generates invalid JSON with unescaped quotes)
-        experimental_repairToolCall: async ({ toolCall }) => {
-            // The toolCall.input contains the raw JSON string that failed to parse
-            const rawJson =
-                typeof toolCall.input === "string" ? toolCall.input : null
-
-            if (rawJson) {
-                try {
-                    // Fix unescaped quotes: x="520" should be x=\"520\"
-                    const fixed = rawJson.replace(
-                        /([a-zA-Z])="(\d+)"/g,
-                        '$1=\\"$2\\"',
-                    )
-                    const parsed = JSON.parse(fixed)
-                    return {
-                        type: "tool-call" as const,
-                        toolCallId: toolCall.toolCallId,
-                        toolName: toolCall.toolName,
-                        input: JSON.stringify(parsed),
-                    }
-                } catch {
-                    // Repair failed, return null
-                }
-            }
-            return null
-        },
         onFinish: ({ text, usage }) => {
             // Pass usage to Langfuse (Bedrock streaming doesn't auto-report tokens to telemetry)
             setTraceOutput(text, {
@@ -396,36 +370,32 @@ ${lastMessageText}
         tools: {
             // Client-side tool that will be executed on the client
             display_diagram: {
-                description: `Display a diagram on draw.io. Pass the XML content inside <root> tags.
+                description: `Display a diagram on draw.io. Pass ONLY the mxCell elements - wrapper tags and root cells are added automatically.
 
 VALIDATION RULES (XML will be rejected if violated):
-1. All mxCell elements must be DIRECT children of <root> - never nested
-2. Every mxCell needs a unique id
-3. Every mxCell (except id="0") needs a valid parent attribute
-4. Edge source/target must reference existing cell IDs
-5. Escape special chars in values: &lt; &gt; &amp; &quot;
-6. Always start with: <mxCell id="0"/><mxCell id="1" parent="0"/>
+1. Generate ONLY mxCell elements - NO wrapper tags (<mxfile>, <mxGraphModel>, <root>)
+2. Do NOT include root cells (id="0" or id="1") - they are added automatically
+3. All mxCell elements must be siblings - never nested
+4. Every mxCell needs a unique id (start from "2")
+5. Every mxCell needs a valid parent attribute (use "1" for top-level)
+6. Escape special chars in values: &lt; &gt; &amp; &quot;
 
-Example with swimlanes and edges (note: all mxCells are siblings):
-<root>
-  <mxCell id="0"/>
-  <mxCell id="1" parent="0"/>
-  <mxCell id="lane1" value="Frontend" style="swimlane;" vertex="1" parent="1">
-    <mxGeometry x="40" y="40" width="200" height="200" as="geometry"/>
-  </mxCell>
-  <mxCell id="step1" value="Step 1" style="rounded=1;" vertex="1" parent="lane1">
-    <mxGeometry x="20" y="60" width="160" height="40" as="geometry"/>
-  </mxCell>
-  <mxCell id="lane2" value="Backend" style="swimlane;" vertex="1" parent="1">
-    <mxGeometry x="280" y="40" width="200" height="200" as="geometry"/>
-  </mxCell>
-  <mxCell id="step2" value="Step 2" style="rounded=1;" vertex="1" parent="lane2">
-    <mxGeometry x="20" y="60" width="160" height="40" as="geometry"/>
-  </mxCell>
-  <mxCell id="edge1" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;" edge="1" parent="1" source="step1" target="step2">
-    <mxGeometry relative="1" as="geometry"/>
-  </mxCell>
-</root>
+Example (generate ONLY this - no wrapper tags):
+<mxCell id="lane1" value="Frontend" style="swimlane;" vertex="1" parent="1">
+  <mxGeometry x="40" y="40" width="200" height="200" as="geometry"/>
+</mxCell>
+<mxCell id="step1" value="Step 1" style="rounded=1;" vertex="1" parent="lane1">
+  <mxGeometry x="20" y="60" width="160" height="40" as="geometry"/>
+</mxCell>
+<mxCell id="lane2" value="Backend" style="swimlane;" vertex="1" parent="1">
+  <mxGeometry x="280" y="40" width="200" height="200" as="geometry"/>
+</mxCell>
+<mxCell id="step2" value="Step 2" style="rounded=1;" vertex="1" parent="lane2">
+  <mxGeometry x="20" y="60" width="160" height="40" as="geometry"/>
+</mxCell>
+<mxCell id="edge1" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;" edge="1" parent="1" source="step1" target="step2">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
 
 Notes:
 - For AWS diagrams, use **AWS 2025 icons**.
@@ -438,32 +408,56 @@ Notes:
                 }),
             },
             edit_diagram: {
-                description: `Edit specific parts of the current diagram by replacing exact line matches. Use this tool to make targeted fixes without regenerating the entire XML.
-CRITICAL: Copy-paste the EXACT search pattern from the "Current diagram XML" in system context. Do NOT reorder attributes or reformat - the attribute order in draw.io XML varies and you MUST match it exactly.
-IMPORTANT: Keep edits concise:
-- COPY the exact mxCell line from the current XML (attribute order matters!)
-- Only include the lines that are changing, plus 1-2 surrounding lines for context if needed
-- Break large changes into multiple smaller edits
-- Each search must contain complete lines (never truncate mid-line)
-- First match only - be specific enough to target the right element
+                description: `Edit the current diagram by ID-based operations (update/add/delete cells).
 
-⚠️ JSON ESCAPING: Every " inside string values MUST be escaped as \\". Example: x=\\"100\\" y=\\"200\\" - BOTH quotes need backslashes!`,
+Operations:
+- update: Replace an existing cell by its id. Provide cell_id and complete new_xml.
+- add: Add a new cell. Provide cell_id (new unique id) and new_xml.
+- delete: Remove a cell by its id. Only cell_id is needed.
+
+For update/add, new_xml must be a complete mxCell element including mxGeometry.
+
+⚠️ JSON ESCAPING: Every " inside new_xml MUST be escaped as \\". Example: id=\\"5\\" value=\\"Label\\"`,
                 inputSchema: z.object({
-                    edits: z
+                    operations: z
                         .array(
                             z.object({
-                                search: z
+                                type: z
+                                    .enum(["update", "add", "delete"])
+                                    .describe("Operation type"),
+                                cell_id: z
                                     .string()
                                     .describe(
-                                        "EXACT lines copied from current XML (preserve attribute order!)",
+                                        "The id of the mxCell. Must match the id attribute in new_xml.",
                                     ),
-                                replace: z
+                                new_xml: z
                                     .string()
-                                    .describe("Replacement lines"),
+                                    .optional()
+                                    .describe(
+                                        "Complete mxCell XML element (required for update/add)",
+                                    ),
                             }),
                         )
+                        .describe("Array of operations to apply"),
+                }),
+            },
+            append_diagram: {
+                description: `Continue generating diagram XML when previous display_diagram output was truncated due to length limits.
+
+WHEN TO USE: Only call this tool after display_diagram was truncated (you'll see an error message about truncation).
+
+CRITICAL INSTRUCTIONS:
+1. Do NOT include any wrapper tags - just continue the mxCell elements
+2. Continue from EXACTLY where your previous output stopped
+3. Complete the remaining mxCell elements
+4. If still truncated, call append_diagram again with the next fragment
+
+Example: If previous output ended with '<mxCell id="x" style="rounded=1', continue with ';" vertex="1">...' and complete the remaining elements.`,
+                inputSchema: z.object({
+                    xml: z
+                        .string()
                         .describe(
-                            "Array of search/replace pairs to apply sequentially",
+                            "Continuation XML fragment to append (NO wrapper tags)",
                         ),
                 }),
             },
@@ -491,6 +485,7 @@ IMPORTANT: Keep edits concise:
                 return {
                     inputTokens: totalInputTokens,
                     outputTokens: usage.outputTokens ?? 0,
+                    finishReason: (part as any).finishReason,
                 }
             }
             return undefined

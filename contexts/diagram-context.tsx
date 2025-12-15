@@ -5,7 +5,7 @@ import { createContext, useContext, useRef, useState } from "react"
 import type { DrawIoEmbedRef } from "react-drawio"
 import { STORAGE_DIAGRAM_XML_KEY } from "@/components/chat-panel"
 import type { ExportFormat } from "@/components/save-dialog"
-import { extractDiagramXML, validateMxCellStructure } from "../lib/utils"
+import { extractDiagramXML, validateAndFixXml } from "../lib/utils"
 
 interface DiagramContextType {
     chartXML: string
@@ -42,48 +42,13 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
     const resolverRef = useRef<((value: string) => void) | null>(null)
     // Track if we're expecting an export for history (user-initiated)
     const expectHistoryExportRef = useRef<boolean>(false)
-    // Store XML that needs to be loaded when DrawIO becomes ready
-    const pendingXmlRef = useRef<string>("")
 
     const onDrawioLoad = () => {
         // Only set ready state once to prevent infinite loops
         if (hasCalledOnLoadRef.current) return
         hasCalledOnLoadRef.current = true
-        console.log("[DiagramContext] DrawIO loaded, setting ready state")
+        // console.log("[DiagramContext] DrawIO loaded, setting ready state")
         setIsDrawioReady(true)
-
-        // Load any pending XML that was set before DrawIO was ready
-        if (pendingXmlRef.current && drawioRef.current) {
-            try {
-                drawioRef.current.load({
-                    xml: pendingXmlRef.current,
-                })
-                console.log(
-                    "[DiagramContext] Loaded pending XML after DrawIO ready",
-                )
-            } catch (error) {
-                console.error(
-                    "[DiagramContext] Failed to load pending XML:",
-                    error,
-                )
-            }
-            pendingXmlRef.current = ""
-        } else if (chartXML && drawioRef.current) {
-            // If no pending XML but we have existing chartXML, load it
-            try {
-                drawioRef.current.load({
-                    xml: chartXML,
-                })
-                console.log(
-                    "[DiagramContext] Loaded existing chartXML after DrawIO ready",
-                )
-            } catch (error) {
-                console.error(
-                    "[DiagramContext] Failed to load existing chartXML:",
-                    error,
-                )
-            }
-        }
     }
 
     const resetDrawioReady = () => {
@@ -121,38 +86,44 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
         chart: string,
         skipValidation?: boolean,
     ): string | null => {
+        console.time("perf:loadDiagram")
+        let xmlToLoad = chart
+
         // Validate XML structure before loading (unless skipped for internal use)
         if (!skipValidation) {
-            const validationError = validateMxCellStructure(chart)
-            if (validationError) {
-                console.warn("[loadDiagram] Validation error:", validationError)
-                return validationError
+            console.time("perf:loadDiagram-validation")
+            const validation = validateAndFixXml(chart)
+            console.timeEnd("perf:loadDiagram-validation")
+            if (!validation.valid) {
+                console.warn(
+                    "[loadDiagram] Validation error:",
+                    validation.error,
+                )
+                console.timeEnd("perf:loadDiagram")
+                return validation.error
+            }
+            // Use fixed XML if auto-fix was applied
+            if (validation.fixed) {
+                console.log(
+                    "[loadDiagram] Auto-fixed XML issues:",
+                    validation.fixes,
+                )
+                xmlToLoad = validation.fixed
             }
         }
 
         // Keep chartXML in sync even when diagrams are injected (e.g., display_diagram tool)
-        setChartXML(chart)
+        setChartXML(xmlToLoad)
 
-        if (drawioRef.current && isDrawioReady) {
-            try {
-                drawioRef.current.load({
-                    xml: chart,
-                })
-                console.log(
-                    "[loadDiagram] Successfully loaded diagram into DrawIO",
-                )
-            } catch (error) {
-                console.error("[loadDiagram] Failed to load diagram:", error)
-                return "Failed to load diagram into DrawIO"
-            }
-        } else {
-            // Store XML for later loading when DrawIO becomes ready
-            pendingXmlRef.current = chart
-            console.log(
-                "[loadDiagram] DrawIO not ready, storing XML for later loading",
-            )
+        if (drawioRef.current) {
+            console.time("perf:drawio-iframe-load")
+            drawioRef.current.load({
+                xml: xmlToLoad,
+            })
+            console.timeEnd("perf:drawio-iframe-load")
         }
 
+        console.timeEnd("perf:loadDiagram")
         return null
     }
 
@@ -170,27 +141,24 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
         }
 
         const extractedXML = extractDiagramXML(data.data)
-
-        // Only update chartXML if it's different (prevent unnecessary re-renders)
-        if (extractedXML !== chartXML) {
-            console.log(
-                "[DiagramContext] Updating chartXML from export, length:",
-                extractedXML.length,
-            )
-            setChartXML(extractedXML)
-        }
-
+        setChartXML(extractedXML)
         setLatestSvg(data.data)
 
         // Only add to history if this was a user-initiated export
+        // Limit to 20 entries to prevent memory leaks during long sessions
+        const MAX_HISTORY_SIZE = 20
         if (expectHistoryExportRef.current) {
-            setDiagramHistory((prev) => [
-                ...prev,
-                {
-                    svg: data.data,
-                    xml: extractedXML,
-                },
-            ])
+            setDiagramHistory((prev) => {
+                const newHistory = [
+                    ...prev,
+                    {
+                        svg: data.data,
+                        xml: extractedXML,
+                    },
+                ]
+                // Keep only the last MAX_HISTORY_SIZE entries (circular buffer)
+                return newHistory.slice(-MAX_HISTORY_SIZE)
+            })
             expectHistoryExportRef.current = false
         }
 
