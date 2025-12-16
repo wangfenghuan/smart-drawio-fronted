@@ -96,7 +96,7 @@ function hasToolErrors(messages: ChatMessage[]): boolean {
         lastToolPart.state === TOOL_ERROR_STATE
     ) {
         // Allow retries for cell ID mismatches but limit to prevent infinite loops
-        const errorText = lastToolPart.errorText || ""
+        const errorText = (lastToolPart.errorText as string) || ""
         if (
             errorText.includes("not found") ||
             errorText.includes("ID mismatch")
