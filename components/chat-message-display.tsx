@@ -833,6 +833,10 @@ export function ChatMessageDisplay({
                         return (
                             <div
                                 className={`px-4 py-3 border-t border-border/40 text-sm ${isTruncated ? "text-yellow-600" : "text-red-600"}`}
+                                style={{
+                                    whiteSpace: "pre-line",
+                                    lineHeight: "1.6",
+                                }}
                             >
                                 {isTruncated
                                     ? "Output truncated due to length limits. Try a simpler request or increase the maxOutputLength."
@@ -1314,7 +1318,47 @@ export function ChatMessageDisplay({
                                                                                                         : "dark:prose-invert"
                                                                                                 }`}
                                                                                             >
-                                                                                                <ReactMarkdown>
+                                                                                                <ReactMarkdown
+                                                                                                    components={{
+                                                                                                        // Custom p component to handle single \n as line breaks
+                                                                                                        p: ({
+                                                                                                            children,
+                                                                                                            ...props
+                                                                                                        }) => (
+                                                                                                            <p
+                                                                                                                {...props}
+                                                                                                                className="mb-2 last:mb-0"
+                                                                                                                style={{
+                                                                                                                    whiteSpace:
+                                                                                                                        "pre-line",
+                                                                                                                    lineHeight:
+                                                                                                                        "1.6",
+                                                                                                                }}
+                                                                                                            >
+                                                                                                                {
+                                                                                                                    children
+                                                                                                                }
+                                                                                                            </p>
+                                                                                                        ),
+                                                                                                        // Handle text nodes directly for better line break handling
+                                                                                                        text: ({
+                                                                                                            children,
+                                                                                                        }) => (
+                                                                                                            <span
+                                                                                                                style={{
+                                                                                                                    whiteSpace:
+                                                                                                                        "pre-line",
+                                                                                                                    lineHeight:
+                                                                                                                        "1.6",
+                                                                                                                }}
+                                                                                                            >
+                                                                                                                {
+                                                                                                                    children
+                                                                                                                }
+                                                                                                            </span>
+                                                                                                        ),
+                                                                                                    }}
+                                                                                                >
                                                                                                     {
                                                                                                         section.content
                                                                                                     }

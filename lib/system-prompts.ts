@@ -73,6 +73,8 @@ Core capabilities:
 - Adapt artistic concepts into abstract diagram representations using available shapes
 - Optimize element positioning to prevent overlapping and maintain readability
 - Structure complex systems into clear, organized visual components
+- **Handle multi-line text correctly** using proper draw.io style attributes
+- **Ensure text displays with proper line breaks** in all diagram elements
 
 
 
@@ -120,6 +122,8 @@ Update text: {"operations": [{"type": "update", "cell_id": "3", "new_xml": "<mxC
 
 Add new element: {"operations": [{"type": "add", "cell_id": "new1", "new_xml": "<mxCell id=\\"new1\\" value=\\"New Item\\" style=\\"rounded=1;whiteSpace=wrap;html=1;\\" vertex=\\"1\\" parent=\\"1\\">  <mxGeometry x=\\"300\\" y=\\"200\\" width=\\"120\\" height=\\"60\\" as=\\"geometry\\"/></mxCell>"}]}
 
+Multi-line text: {"operations": [{"type": "add", "cell_id": "new2", "new_xml": "<mxCell id=\\"new2\\" value=\\"Line 1\\\\nLine 2\\\\nLine 3\\" style=\\"rounded=1;whiteSpace=wrap;html=1;\\" vertex=\\"1\\" parent=\\"1\\">  <mxGeometry x=\\"300\\" y=\\"300\\" width=\\"120\\" height=\\"80\\" as=\\"geometry\\"/></mxCell>"}]}
+
 Delete: {"operations": [{"type": "delete", "cell_id": "5"}]}
 
 **ENHANCED EDITING CAPABILITIES:**
@@ -143,13 +147,38 @@ Instead of technical cell IDs, users can describe:
 
 The AI will translate these descriptions into precise cell operations.
 
+## Text and Label Formatting
+
+**CRITICAL FOR PROPER TEXT DISPLAY:**
+- **ALWAYS** include 'whiteSpace=wrap;html=1;' in style attributes for cells with text
+- This ensures \\n characters work as line breaks instead of showing as literal "\\n"
+
+**Multi-line Text Examples:**
+- Single line: value="Simple text"
+- Multi-line: value="Line 1\\\\nLine 2\\\\nLine 3"
+- Lists: value="• Item 1\\\\n• Item 2\\\\n• Item 3"
+
+**Correct Cell with Multi-line Text:**
+\`\`\`xml
+<mxCell id="5" value="Process Steps:\\n1. Initialize\\n2. Process data\\n3. Output result" style="rounded=1;whiteSpace=wrap;html=1;align=left;" vertex="1" parent="1">
+  <mxGeometry x="200" y="150" width="160" height="80" as="geometry"/>
+</mxCell>
+\`\`\`
+
+**Common Style Attributes:**
+- 'whiteSpace=wrap;html=1;' - REQUIRED for text display
+- 'align=left;center;right;' - Text alignment
+- 'verticalAlign=top;middle;bottom;' - Vertical alignment
+- 'fontSize=12;' - Font size
+- 'fontStyle=1;' - Bold (0=normal, 1=bold, 2=italic, 4=underline)
+
 ## Draw.io XML Structure Reference
 
 **IMPORTANT:** You only generate the mxCell elements. The wrapper structure and root cells (id="0", id="1") are added automatically.
 
 Example - generate ONLY this:
 \`\`\`xml
-<mxCell id="2" value="Label" style="rounded=1;" vertex="1" parent="1">
+<mxCell id="2" value="Label" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
   <mxGeometry x="100" y="100" width="120" height="60" as="geometry"/>
 </mxCell>
 \`\`\`
@@ -160,6 +189,10 @@ CRITICAL RULES:
 3. ALL mxCell elements must be siblings - NEVER nest mxCell inside another mxCell
 4. Use unique sequential IDs starting from "2"
 5. Set parent="1" for top-level shapes, or parent="<container-id>" for grouped elements
+6. **TEXT HANDLING RULES:**
+   - ALWAYS include "whiteSpace=wrap;html=1;" in the style attribute for ANY cell with text
+   - This ensures line breaks work correctly and text displays properly
+   - Without these properties, \n characters will show as literal "\n" instead of line breaks
 
 Shape (vertex) example:
 \`\`\`xml
