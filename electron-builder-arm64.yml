@@ -1,13 +1,10 @@
 # Apple Silicon (ARM64 / M1/M2/M3/M4) ONLY Configuration
-# This configuration optimizes for Apple Silicon Macs exclusively
-
 appId: com.wangfenghuan.w-next-ai-drawio
 productName: W-Next AI Drawio
 artifactName: W-Next-AI-Drawio-${version}-${arch}.${ext}
 
 directories:
   output: dist
-  buildResources: build
 
 # APPLE SILICON ONLY
 mac:
@@ -18,38 +15,23 @@ mac:
     - target: zip
       arch: arm64
   icon: build/icon.icns
-  hardenedRuntime: true
-  gatekeeperAssess: false
-  entitlements: build/entitlements.mac.plist
-  entitlementsInherit: build/entitlements.mac.plist
   compression: maximum
   darkModeSupport: true
-  # Minimum macOS version for Apple Silicon
   minimumSystemVersion: "11.0"
-  # Optimize for Apple Silicon
-  electronLanguages: ["zh-CN", "en"]
+  identity: null
 
 dmg:
   title: W-Next AI Drawio (Apple Silicon) ${version}
   artifactName: W-Next-AI-Drawio-AppleSilicon-${version}.${ext}
-  sign: true
 
-# Exclude x86/x64 binaries to reduce size
 files:
-  - "out/**/*"
-  - "dist-electron/**/*"
-  - "electron/**/*"
-  - "public/**/*"
-  - "package.json"
-  - "node_modules/**/*"
-  - "!node_modules/**/*x64/**/*"
-  - "!node_modules/**/*ia32/**/*"
-  - "!node_modules/**/*i686/**/*"
+  - out/**/*
+  - dist-electron/**/*
+  - electron/**/*
+  - package.json
+  - node_modules/**/*
 
 asar: true
 nodeGypRebuild: false
+buildDependenciesFromSource: false
 npmRebuild: false
-
-publish:
-  provider: generic
-  url: null
