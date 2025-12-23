@@ -37,6 +37,9 @@ jobs:
         run: npm run electron:compile
 
       - name: Build macOS Apple Silicon app
+        # 👇【修改点】显式引入你在后台配置的 GH_TOKEN
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           npm run electron:build:mac:arm64
 
@@ -77,6 +80,9 @@ jobs:
         run: npm run electron:compile
 
       - name: Build Windows AMD64 app
+        # 👇【修改点】Windows 这里也要引入
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           npm run electron:build:win:x64
 
@@ -163,6 +169,8 @@ jobs:
           draft: false
           prerelease: false
         env:
+          # release 步骤通常默认用 GITHUB_TOKEN 就够了，
+          # 但如果你想统一用 GH_TOKEN 也可以改成 GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   create-release-draft:
