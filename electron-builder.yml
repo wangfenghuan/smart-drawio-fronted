@@ -3,7 +3,9 @@ productName: W-Next AI Drawio
 directories:
   output: dist
 files:
-  - out/**/*
+  - .next/standalone/**/*
+  - .next/static/**/*
+  - public/**/*
   - dist-electron/**/*
   - electron/**/*
   - package.json

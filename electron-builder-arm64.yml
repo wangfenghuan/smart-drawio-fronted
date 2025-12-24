@@ -25,7 +25,9 @@ dmg:
   artifactName: W-Next-AI-Drawio-AppleSilicon-${version}.${ext}
 
 files:
-  - out/**/*
+  - .next/standalone/**/*
+  - .next/static/**/*
+  - public/**/*
   - dist-electron/**/*
   - electron/**/*
   - package.json

@@ -30,23 +30,22 @@ function createWindow(): void {
     } else {
         // Start Next.js server in production
         const nextjsPort = 6001
-        const nextjsPath = require.resolve("next/dist/bin/next")
+        const appRoot = join(__dirname, "..")
+        const standalonePath = join(appRoot, ".next", "standalone")
 
-        console.log("Starting Next.js server...")
+        console.log("Starting Next.js server from standalone build...")
+        console.log(`App root: ${appRoot}`)
 
-        nextjsProcess = spawn(
-            process.execPath,
-            [nextjsPath, "start", "--port", String(nextjsPort)],
-            {
-                cwd: join(__dirname, ".."),
-                stdio: "inherit",
-                env: {
-                    ...process.env,
-                    NODE_ENV: "production",
-                    PORT: String(nextjsPort),
-                },
+        nextjsProcess = spawn(process.execPath, ["server.js"], {
+            cwd: standalonePath,
+            stdio: "inherit",
+            env: {
+                ...process.env,
+                NODE_ENV: "production",
+                PORT: String(nextjsPort),
+                HOSTNAME: "127.0.0.1",
             },
-        )
+        })
 
         // Wait for server to start, then load
         setTimeout(() => {
