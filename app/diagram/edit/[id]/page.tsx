@@ -3,7 +3,10 @@ import { Maximize2, Minimize2 } from "lucide-react"
 import { useParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { DrawIoEmbed } from "react-drawio"
+import { useSelector } from "react-redux"
 import type { ImperativePanelHandle } from "react-resizable-panels"
+import { toast } from "sonner"
+import { DiagramToolbar } from "@/components/diagram-toolbar"
 import { STORAGE_CLOSE_PROTECTION_KEY } from "@/components/settings-dialog"
 import SimpleChatPanel from "@/components/simple-chat-panel"
 import {
@@ -12,6 +15,8 @@ import {
     ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { useDiagram } from "@/contexts/diagram-context"
+import { useDiagramSave } from "@/lib/use-diagram-save"
+import type { RootState } from "@/stores"
 
 const drawioBaseUrl =
     process.env.NEXT_PUBLIC_DRAWIO_BASE_URL || "https://embed.diagrams.net"
@@ -20,9 +25,22 @@ export default function DrawioHome() {
     // 获取路由参数中的图表 ID
     const params = useParams()
     const diagramId = params.id as string
+    const diagramIdNum = parseInt(diagramId, 10)
 
-    const { drawioRef, handleDiagramExport, onDrawioLoad, resetDrawioReady } =
-        useDiagram()
+    // 从 Redux store 中获取登录用户信息
+    const loginUser = useSelector((state: RootState) => state.loginUser)
+    const userId = loginUser?.id
+
+    const {
+        drawioRef,
+        handleDiagramExport,
+        onDrawioLoad,
+        resetDrawioReady,
+        chartXML,
+    } = useDiagram()
+    const { saveDiagram, downloadDiagram, handleExportCallback } =
+        useDiagramSave(drawioRef)
+
     const [isMobile, setIsMobile] = useState(false)
     const [isChatVisible, setIsChatVisible] = useState(true)
     const [drawioUi, setDrawioUi] = useState<"min" | "sketch">("min")
@@ -30,6 +48,7 @@ export default function DrawioHome() {
     const [isLoaded, setIsLoaded] = useState(false)
     const [closeProtection, setCloseProtection] = useState(false)
     const [isFullscreen, setIsFullscreen] = useState(false)
+    const [diagramTitle, setDiagramTitle] = useState(`图表_${diagramId}`)
 
     const chatPanelRef = useRef<ImperativePanelHandle>(null)
     const containerRef = useRef<HTMLDivElement>(null)
@@ -153,6 +172,45 @@ export default function DrawioHome() {
         }
     }
 
+    // 保存图表
+    const handleSave = async () => {
+        if (!chartXML) {
+            console.error("没有可保存的图表内容")
+            return false
+        }
+
+        if (!userId) {
+            console.error("用户未登录")
+            toast.error("请先登录后再保存图表")
+            return false
+        }
+
+        return await saveDiagram({
+            diagramId: diagramIdNum,
+            userId: userId,
+            title: diagramTitle,
+            xml: chartXML,
+        })
+    }
+
+    // 下载图表
+    const handleDownload = async (format: "xml" | "png" | "svg") => {
+        await downloadDiagram({
+            diagramId: diagramIdNum,
+            filename: diagramTitle,
+            format: format,
+        })
+    }
+
+    // 覆盖 handleDiagramExport，同时调用原始的和我们新的回调
+    const handleExport = (data: any) => {
+        handleDiagramExport(data) // 原始处理（更新 chartXML）
+        // 检查是否是导出操作，如果是则调用 handleExportCallback
+        if (data && data.data) {
+            handleExportCallback(data.data)
+        }
+    }
+
     // 监听全屏状态变化
     useEffect(() => {
         const handleFullscreenChange = () => {
@@ -169,7 +227,7 @@ export default function DrawioHome() {
     }, [])
 
     return (
-        <div className="flex-1 w-full h-full p-3 relative">
+        <div className="flex-1 w-full h-full p-3 relative overflow-hidden">
             <div
                 ref={containerRef}
                 className={`w-full h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-hidden shadow-2xl border border-white/10 transition-all duration-300 ${
@@ -178,22 +236,38 @@ export default function DrawioHome() {
                         : "rounded-2xl"
                 }`}
             >
-                {/* 全屏按钮 */}
-                <button
-                    onClick={toggleFullscreen}
-                    className="absolute top-4 right-4 z-20 p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all duration-200 hover:scale-110"
-                    title={isFullscreen ? "退出全屏 (ESC)" : "全屏模式"}
-                >
-                    {isFullscreen ? (
-                        <Minimize2 className="h-5 w-5" />
-                    ) : (
-                        <Maximize2 className="h-5 w-5" />
-                    )}
-                </button>
+                {/* 工具栏 - 分散布局避免堆叠 */}
+                <div className="absolute top-5 right-5 z-20 flex items-center gap-6">
+                    {/* 保存按钮组 */}
+                    <div className="flex items-center gap-4">
+                        <DiagramToolbar
+                            diagramId={diagramIdNum}
+                            title={diagramTitle}
+                            xml={chartXML}
+                            onSave={handleSave}
+                        />
+                    </div>
+
+                    {/* 分隔线 */}
+                    <div className="h-8 w-px bg-white/40"></div>
+
+                    {/* 全屏按钮 */}
+                    <button
+                        onClick={toggleFullscreen}
+                        className="p-3 rounded-xl bg-white/95 hover:bg-white text-gray-800 border border-gray-300 hover:border-gray-400 shadow-md transition-all duration-200 hover:scale-105"
+                        title={isFullscreen ? "退出全屏 (ESC)" : "全屏模式"}
+                    >
+                        {isFullscreen ? (
+                            <Minimize2 className="h-6 w-6" />
+                        ) : (
+                            <Maximize2 className="h-6 w-6" />
+                        )}
+                    </button>
+                </div>
                 <ResizablePanelGroup
                     id="main-panel-group"
                     direction={isMobile ? "vertical" : "horizontal"}
-                    className="w-full h-full"
+                    className="w-full h-full overflow-hidden"
                 >
                     {/* Draw.io Canvas */}
                     <ResizablePanel
@@ -206,7 +280,7 @@ export default function DrawioHome() {
                                 <DrawIoEmbed
                                     key={`${drawioUi}-${darkMode}-${diagramId}`}
                                     ref={drawioRef}
-                                    onExport={handleDiagramExport}
+                                    onExport={handleExport}
                                     onLoad={onDrawioLoad}
                                     baseUrl={drawioBaseUrl}
                                     urlParameters={{
@@ -248,6 +322,8 @@ export default function DrawioHome() {
                             isVisible={isChatVisible}
                             onToggleVisibility={toggleChatPanel}
                             darkMode={darkMode}
+                            diagramTitle={diagramTitle}
+                            onDownload={handleDownload}
                         />
                     </ResizablePanel>
                 </ResizablePanelGroup>

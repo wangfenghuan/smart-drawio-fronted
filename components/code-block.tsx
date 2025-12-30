@@ -19,16 +19,19 @@ export function CodeBlock({ code, language = "xml" }: CodeBlockProps) {
                     getTokenProps,
                 }) => (
                     <pre
-                        className="text-[11px] leading-relaxed overflow-x-auto overflow-y-auto max-h-48 scrollbar-thin break-all"
+                        className="text-[11px] leading-relaxed scrollbar-thin"
                         style={{
                             ...style,
                             fontFamily:
                                 "var(--font-mono), ui-monospace, monospace",
                             backgroundColor: "transparent",
                             margin: 0,
-                            padding: 0,
+                            padding: "12px",
+                            overflowX: "auto",
+                            overflowY: "auto",
                             wordBreak: "break-all",
                             whiteSpace: "pre-wrap",
+                            maxHeight: "300px",
                         }}
                     >
                         {tokens.map((line, i) => (
