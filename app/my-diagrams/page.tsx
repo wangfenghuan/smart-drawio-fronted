@@ -41,6 +41,7 @@ export default function MyDiagramsPage() {
     const { message } = App.useApp()
     const router = useRouter()
     const [diagrams, setDiagrams] = useState<API.DiagramVO[]>([])
+    const [allRecords, setAllRecords] = useState<API.DiagramVO[]>([]) // 缓存所有数据
     const [loading, setLoading] = useState(false)
     const [pagination, setPagination] = useState({
         current: 1,
@@ -64,17 +65,55 @@ export default function MyDiagramsPage() {
             const response = await listMyDiagramVoByPage({
                 current: current,
                 pageSize: pageSize,
-                ...(searchText && { diagramName: searchText }),
+                ...(searchText && { searchText: searchText }),
                 sortField: "createTime",
                 sortOrder: "desc",
             })
 
             if (response?.code === 0 && response?.data) {
-                setDiagrams(response.data.records || [])
+                const records = response.data.records || []
+                const backendTotal = Number(response.data.total) || 0
+                const backendSize = Number(response.data.size) || pageSize
+                const backendCurrent = Number(response.data.current) || 1
+
+                // 计算总数，处理后端返回的 total 为 0 或错误的情况
+                let calculatedTotal = backendTotal
+                let needsClientPagination = false
+
+                // 如果后端返回的 total 为 0，但实际有数据，需要估算或使用 records.length
+                if (backendTotal === 0 && records.length > 0) {
+                    // 如果返回的记录数远大于请求的 pageSize，说明后端没有分页，返回了所有数据
+                    if (records.length > pageSize) {
+                        calculatedTotal = records.length
+                        needsClientPagination = true
+                    } else if (records.length === backendSize) {
+                        // 如果正好满页，可能还有下一页，估算为至少有这么多
+                        calculatedTotal =
+                            backendCurrent * backendSize + backendSize
+                    } else {
+                        // 不足一页，说明是最后一页
+                        calculatedTotal =
+                            (backendCurrent - 1) * backendSize + records.length
+                    }
+                }
+
+                // 缓存所有数据（用于客户端分页）
+                if (records.length > pageSize || needsClientPagination) {
+                    setAllRecords(records)
+                    // 前端手动分页
+                    const startIndex = (current - 1) * pageSize
+                    const endIndex = startIndex + pageSize
+                    const displayRecords = records.slice(startIndex, endIndex)
+                    setDiagrams(displayRecords)
+                } else {
+                    setAllRecords([])
+                    setDiagrams(records)
+                }
+
                 setPagination({
-                    current: response.data.current || 1,
-                    pageSize: response.data.size || pageSize,
-                    total: response.data.total || 0,
+                    current: backendCurrent,
+                    pageSize: backendSize,
+                    total: calculatedTotal,
                 })
             }
         } catch (error) {
@@ -93,14 +132,29 @@ export default function MyDiagramsPage() {
     // 搜索
     const handleSearch = (value: string) => {
         setSearchText(value)
+        setAllRecords([]) // 清除缓存
         setPagination({ ...pagination, current: 1 })
         loadDiagrams(1, pagination.pageSize)
     }
 
     // 分页、排序、筛选变化
     const handleTableChange = (page: number, pageSize: number) => {
-        setPagination({ ...pagination, current: page, pageSize })
-        loadDiagrams(page, pageSize)
+        // 如果有客户端缓存数据，直接使用缓存进行分页
+        if (allRecords.length > 0) {
+            const startIndex = (page - 1) * pageSize
+            const endIndex = startIndex + pageSize
+            const displayRecords = allRecords.slice(startIndex, endIndex)
+            setDiagrams(displayRecords)
+            setPagination({
+                current: page,
+                pageSize: pageSize,
+                total: allRecords.length,
+            })
+        } else {
+            // 否则请求后端
+            setPagination({ ...pagination, current: page, pageSize })
+            loadDiagrams(page, pageSize)
+        }
     }
 
     // 跳转到编辑页面
@@ -118,6 +172,7 @@ export default function MyDiagramsPage() {
             const response = await deleteDiagram({ id: Number(id) })
             if (response?.code === 0) {
                 message.success("删除成功")
+                setAllRecords([]) // 清除缓存
                 loadDiagrams()
             } else {
                 message.error(response?.message || "删除失败")
@@ -151,6 +206,7 @@ export default function MyDiagramsPage() {
             if (response?.code === 0) {
                 message.success("保存成功")
                 setEditModalVisible(false)
+                setAllRecords([]) // 清除缓存
                 loadDiagrams()
             } else {
                 message.error(response?.message || "保存失败")
@@ -227,7 +283,7 @@ export default function MyDiagramsPage() {
             >
                 <div style={{ marginBottom: "24px" }}>
                     <Search
-                        placeholder="搜索图表名称..."
+                        placeholder="搜索图表名称、代码..."
                         allowClear
                         enterButton={
                             <Button icon={<SearchOutlined />}>搜索</Button>
@@ -436,14 +492,17 @@ export default function MyDiagramsPage() {
                 </div>
 
                 {/* 分页 */}
-                {diagrams.length > 0 && (
+                {!loading && (
                     <div
                         style={{
-                            marginTop: "24px",
+                            marginTop: "32px",
                             display: "flex",
                             justifyContent: "center",
-                            padding: "16px 0",
+                            alignItems: "center",
+                            padding: "24px 0",
                             borderTop: "1px solid #f0f0f0",
+                            backgroundColor: "#fafafa",
+                            borderRadius: "0 0 8px 8px",
                         }}
                     >
                         <Pagination
@@ -454,8 +513,13 @@ export default function MyDiagramsPage() {
                             onShowSizeChange={handleTableChange}
                             showSizeChanger
                             showQuickJumper
-                            showTotal={(total) => `共 ${total} 条`}
+                            showTotal={(total, range) =>
+                                total > 0
+                                    ? `显示 ${range[0]}-${range[1]} 条，共 ${total} 条`
+                                    : "暂无数据"
+                            }
                             pageSizeOptions={["12", "24", "36", "48"]}
+                            size="default"
                             locale={{
                                 items_per_page: "条/页",
                                 jump_to: "跳至",
@@ -467,6 +531,12 @@ export default function MyDiagramsPage() {
                                 next_5: "向后 5 页",
                                 prev_3: "向前 3 页",
                                 next_3: "向后 3 页",
+                            }}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                flexWrap: "wrap",
+                                gap: "8px",
                             }}
                         />
                     </div>

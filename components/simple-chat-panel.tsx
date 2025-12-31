@@ -10,7 +10,7 @@ import {
     Settings,
     Square,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import rehypeHighlight from "rehype-highlight"
 import remarkGfm from "remark-gfm"
@@ -57,6 +57,7 @@ export default function SimpleChatPanel({
     const [downloadDialogOpen, setDownloadDialogOpen] = useState(false)
     const [aiConfig, setAiConfig] = useAIConfig()
     const { loadDiagram } = useDiagram()
+    const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const {
         messages,
@@ -141,6 +142,11 @@ export default function SimpleChatPanel({
 
         loadHistory()
     }, [diagramId, historyLoaded, setMessages])
+
+    // 自动滚动到底部
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }, [messages])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -481,6 +487,9 @@ export default function SimpleChatPanel({
                             <p className="text-sm mt-1">{error.message}</p>
                         </div>
                     )}
+
+                    {/* 用于自动滚动的锚点 */}
+                    <div ref={messagesEndRef} />
                 </div>
             </div>
 

@@ -316,15 +316,18 @@ export default function DrawioHome() {
                         collapsedSize={isMobile ? 0 : 3}
                         onCollapse={() => setIsChatVisible(false)}
                         onExpand={() => setIsChatVisible(true)}
+                        className="overflow-hidden"
                     >
-                        <SimpleChatPanel
-                            diagramId={diagramId}
-                            isVisible={isChatVisible}
-                            onToggleVisibility={toggleChatPanel}
-                            darkMode={darkMode}
-                            diagramTitle={diagramTitle}
-                            onDownload={handleDownload}
-                        />
+                        <div className="h-full w-full overflow-hidden">
+                            <SimpleChatPanel
+                                diagramId={diagramId}
+                                isVisible={isChatVisible}
+                                onToggleVisibility={toggleChatPanel}
+                                darkMode={darkMode}
+                                diagramTitle={diagramTitle}
+                                onDownload={handleDownload}
+                            />
+                        </div>
                     </ResizablePanel>
                 </ResizablePanelGroup>
             </div>
