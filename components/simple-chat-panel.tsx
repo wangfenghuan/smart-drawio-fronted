@@ -9,7 +9,7 @@ import {
     Send,
     Settings,
     Square,
-    Trash2, // 引入垃圾桶图标，替换清空按钮的文字，节省空间
+    Trash2,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
@@ -18,7 +18,6 @@ import rehypeHighlight from "rehype-highlight"
 import remarkGfm from "remark-gfm"
 import { toast } from "sonner"
 import { listDiagramChatHistory } from "@/api/conversionController"
-import { editDiagram, uploadDiagram } from "@/api/diagramController"
 import type { API } from "@/api/typings"
 import {
     type AIConfig,
@@ -61,11 +60,13 @@ export default function SimpleChatPanel({
     const [historyLoaded, setHistoryLoaded] = useState(false)
     const [configDialogOpen, setConfigDialogOpen] = useState(false)
     const [downloadDialogOpen, setDownloadDialogOpen] = useState(false)
+
+    // 控制保存按钮的 Loading 状态
     const [isSaving, setIsSaving] = useState(false)
+
     const [aiConfig, setAiConfig] = useAIConfig()
     const { loadDiagram, drawioRef, chartXML } = useDiagram()
-    const { saveDiagram: saveDiagramToServer, handleExportCallback } =
-        useDiagramSave(drawioRef)
+    const { saveDiagram: saveDiagramToServer } = useDiagramSave(drawioRef)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const loginUser = useSelector((state: RootState) => state.loginUser)
 
@@ -157,42 +158,61 @@ export default function SimpleChatPanel({
         clearMessages()
     }
 
-    // 保存图表到服务器
+    // --- 核心修复：保存图表逻辑 ---
     const handleSaveDiagram = async () => {
+        // 1. 基础校验
         if (!chartXML) {
             toast.error("图表内容为空")
             return
         }
 
-        // 检查用户是否登录
+        // 2. 防止重复点击
+        if (isSaving) return
+
+        // 3. 登录校验
         const isLogin = loginUser?.id && loginUser?.userRole !== "notLogin"
         if (!isLogin) {
-            console.error("用户未登录", {
-                userId: loginUser?.id,
-                userRole: loginUser?.userRole,
-            })
             toast.error("请先登录后再保存图表")
             return
         }
 
+        // 4. 开启 Loading
         setIsSaving(true)
-        try {
-            // 使用 useDiagramSave hook 中的 saveDiagram 函数
-            const success = await saveDiagramToServer({
-                diagramId: diagramId,
-                userId: loginUser.id,
-                title: diagramTitle,
-                xml: chartXML,
-            })
 
-            if (!success) {
-                throw new Error("保存失败")
-            }
+        try {
+            // 5. 构造一个超时 Promise (15秒超时)
+            // 如果后端或者 Draw.io 卡死，这个 Promise 会强制 reject，终止死循环
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(
+                    () => reject(new Error("保存请求超时，请检查网络或重试")),
+                    15000,
+                ),
+            )
+
+            // 6. 使用 Promise.race 竞速：保存逻辑 vs 超时计时器
+            await Promise.race([
+                saveDiagramToServer({
+                    diagramId: diagramId,
+                    userId: loginUser.id,
+                    title: diagramTitle,
+                    xml: chartXML,
+                }),
+                timeoutPromise,
+            ])
+
+            // 注意：成功的 Toast 已经在 useDiagramSave 内部处理了
         } catch (error) {
-            console.error("保存图表失败:", error)
-            // 错误提示已经在 saveDiagram 中处理了
+            console.error("保存图表异常:", error)
+            // 如果是超时错误，在这里给用户提示
+            toast.error(
+                error instanceof Error ? error.message : "保存失败，请稍后重试",
+            )
         } finally {
-            setIsSaving(false)
+            // 7. 无论成功还是失败，延时 1 秒后强制恢复按钮状态
+            // 这样能确保按钮永远不会“一直转圈”
+            setTimeout(() => {
+                setIsSaving(false)
+            }, 1000)
         }
     }
 
@@ -213,9 +233,8 @@ export default function SimpleChatPanel({
 
     return (
         <div className="h-full w-full flex flex-col bg-gradient-to-b from-slate-900 to-slate-800 rounded-r-2xl overflow-hidden relative">
-            {/* --- 顶部工具栏 (修改了这里) --- */}
+            {/* --- 顶部工具栏 --- */}
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-black/20 z-10">
-                {/* 左侧标题 */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <MessageSquare className="h-4 w-4 text-blue-400" />
                     <h2 className="text-base font-semibold text-white whitespace-nowrap">
@@ -223,15 +242,25 @@ export default function SimpleChatPanel({
                     </h2>
                 </div>
 
-                {/* 右侧按钮组：增加了 gap，添加了分隔线 */}
                 <div className="flex items-center gap-3">
                     <button
                         onClick={handleSaveDiagram}
+                        // 禁用条件：正在保存中 OR 图表为空
                         disabled={isSaving || !chartXML}
-                        className="p-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 hover:text-blue-300 border border-blue-500/30 transition-all duration-200 hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="保存图表"
+                        className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 border 
+                            ${
+                                isSaving || !chartXML
+                                    ? "bg-gray-500/10 text-gray-500 border-transparent cursor-not-allowed opacity-50"
+                                    : "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 hover:text-blue-300 border-blue-500/30"
+                            }`}
+                        title={isSaving ? "正在保存..." : "保存图表"}
                     >
-                        <Save className="h-4 w-4" />
+                        {/* Loading 动画图标 */}
+                        {isSaving ? (
+                            <span className="animate-spin h-4 w-4 block border-2 border-current border-t-transparent rounded-full text-blue-400" />
+                        ) : (
+                            <Save className="h-4 w-4" />
+                        )}
                     </button>
 
                     <button
@@ -267,7 +296,6 @@ export default function SimpleChatPanel({
                         <Trash2 className="h-4 w-4" />
                     </button>
 
-                    {/* 垂直分隔线 */}
                     <div className="w-px h-4 bg-white/10 mx-1"></div>
 
                     <button
@@ -280,7 +308,7 @@ export default function SimpleChatPanel({
                 </div>
             </div>
 
-            {/* --- 消息列表容器 (保持之前的修复) --- */}
+            {/* --- 消息列表容器 --- */}
             <div className="flex-1 relative min-h-0 w-full">
                 <div className="absolute inset-0 overflow-y-auto overflow-x-hidden bg-gradient-to-b from-transparent to-black/20 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
                     <div className="p-4 space-y-4">
@@ -354,11 +382,6 @@ export default function SimpleChatPanel({
                                                                 const isLongCode =
                                                                     codeContent.length >
                                                                     500
-                                                                const remainingLines =
-                                                                    codeContent.split(
-                                                                        "\n",
-                                                                    ).length - 3
-
                                                                 return (
                                                                     <Collapsible
                                                                         defaultOpen={
