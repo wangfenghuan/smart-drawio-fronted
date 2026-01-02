@@ -63,8 +63,14 @@ export default function SimpleChatPanel({
     const [isSaving, setIsSaving] = useState(false)
 
     const [aiConfig, setAiConfig] = useAIConfig()
-    const { loadDiagram, drawioRef, chartXML, registerExportCallback } =
-        useDiagram()
+    const {
+        loadDiagram,
+        drawioRef,
+        chartXML,
+        registerExportCallback,
+        handleExportWithoutHistory,
+        resolverRef,
+    } = useDiagram()
     const { saveDiagram: saveDiagramToServer, handleExportCallback } =
         useDiagramSave(drawioRef)
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -165,10 +171,6 @@ export default function SimpleChatPanel({
 
     // --- 修复后的保存逻辑 ---
     const handleSaveDiagram = async () => {
-        if (!chartXML) {
-            toast.error("图表内容为空")
-            return
-        }
         if (isSaving) return
 
         const isLogin = loginUser?.id && loginUser?.userRole !== "notLogin"
@@ -180,8 +182,33 @@ export default function SimpleChatPanel({
         setIsSaving(true)
 
         try {
+            // 🔧 关键修复：先导出最新的 XML，而不是使用缓存的 chartXML
+            // 这样才能获取 Draw.io 中的最新修改
+            toast.loading("正在获取最新图表数据...", { id: "save-diagram" })
+
+            const latestXML = await Promise.race([
+                new Promise<string>((resolve) => {
+                    // 设置 resolver 来接收导出结果
+                    if (resolverRef && "current" in resolverRef) {
+                        resolverRef.current = resolve
+                    }
+                    // 触发导出（不保存到历史记录）
+                    handleExportWithoutHistory()
+                }),
+                new Promise<string>((_, reject) =>
+                    setTimeout(
+                        () => reject(new Error("导出超时（10秒）")),
+                        10000,
+                    ),
+                ),
+            ])
+
+            console.log(
+                "[handleSaveDiagram] 获取到最新 XML:",
+                latestXML?.substring(0, 100),
+            )
+
             // 构造超时 Promise (15秒)
-            // 修复了你之前的语法错误，使用标准写法
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => {
                     reject(new Error("保存请求超时，请检查网络"))
@@ -194,7 +221,7 @@ export default function SimpleChatPanel({
                     diagramId: diagramId,
                     userId: loginUser.id,
                     title: diagramTitle,
-                    xml: chartXML,
+                    xml: latestXML, // ✅ 使用最新导出的 XML
                 }),
                 timeoutPromise,
             ])
