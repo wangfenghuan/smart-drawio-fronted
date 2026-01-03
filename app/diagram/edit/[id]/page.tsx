@@ -277,15 +277,17 @@ export default function DrawioHome() {
                 }`}
             >
                 {/* 工具栏 - 分散布局避免堆叠 */}
-                <div className="absolute top-5 right-5 z-20 flex items-center gap-6">
-                    {/* 协作面板 */}
-                    <CollaborationPanel />
+                <div className="absolute top-5 right-5 z-20 flex items-center">
+                    {/* 协作面板 - 放在最左边，增加右边距 */}
+                    <div className="mr-4">
+                        <CollaborationPanel />
+                    </div>
 
                     {/* 分隔线 */}
-                    <div className="h-8 w-px bg-white/40"></div>
+                    <div className="h-8 w-px bg-white/40 mx-2"></div>
 
                     {/* 保存按钮组 */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         <DiagramToolbar
                             diagramId={diagramId}
                             title={diagramTitle}
@@ -295,7 +297,7 @@ export default function DrawioHome() {
                     </div>
 
                     {/* 分隔线 */}
-                    <div className="h-8 w-px bg-white/40"></div>
+                    <div className="h-8 w-px bg-white/40 mx-2"></div>
 
                     {/* 全屏按钮 */}
                     <button
