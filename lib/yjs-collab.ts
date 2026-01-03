@@ -194,7 +194,7 @@ export class YjsCollaboration {
         try {
             // 1. 先尝试获取分布式锁（使用现有的后端接口）
             const lockResult = await checkLock({
-                roomId: parseInt(this.roomName),
+                roomId: this.roomName, // 直接使用字符串，避免精度丢失
             })
 
             if (!lockResult) {
