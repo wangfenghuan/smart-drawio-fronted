@@ -7,6 +7,7 @@ import { useSelector } from "react-redux"
 import type { ImperativePanelHandle } from "react-resizable-panels"
 import { toast } from "sonner"
 import { getDiagramVoById } from "@/api/diagramController"
+import { CollaborationPanel } from "@/components/collaboration-panel"
 import { DiagramToolbar } from "@/components/diagram-toolbar"
 import { STORAGE_CLOSE_PROTECTION_KEY } from "@/components/settings-dialog"
 import SimpleChatPanel from "@/components/simple-chat-panel"
@@ -277,6 +278,12 @@ export default function DrawioHome() {
             >
                 {/* 工具栏 - 分散布局避免堆叠 */}
                 <div className="absolute top-5 right-5 z-20 flex items-center gap-6">
+                    {/* 协作面板 */}
+                    <CollaborationPanel />
+
+                    {/* 分隔线 */}
+                    <div className="h-8 w-px bg-white/40"></div>
+
                     {/* 保存按钮组 */}
                     <div className="flex items-center gap-4">
                         <DiagramToolbar

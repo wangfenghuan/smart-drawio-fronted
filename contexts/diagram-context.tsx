@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useRef, useState } from "react"
 import type { DrawIoEmbedRef } from "react-drawio"
 import { STORAGE_DIAGRAM_XML_KEY } from "@/components/chat-panel"
 import type { ExportFormat } from "@/components/save-dialog"
+import { useYjsCollaboration } from "../lib/use-yjs-collaboration"
 import { extractDiagramXML, validateAndFixXml } from "../lib/utils"
 
 interface DiagramContextType {
@@ -28,6 +29,15 @@ interface DiagramContextType {
     resetDrawioReady: () => void
     // 新增：注册外部导出回调处理器
     registerExportCallback: (callback: ((data: string) => void) | null) => void
+    // Yjs 协作相关
+    collaborationEnabled: boolean
+    collaborationConnected: boolean
+    collaborationUserCount: number
+    toggleCollaboration: (
+        enabled: boolean,
+        roomName?: string,
+        isReadOnly?: boolean,
+    ) => void
 }
 
 const DiagramContext = createContext<DiagramContextType | undefined>(undefined)
@@ -44,6 +54,43 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
     const resolverRef = useRef<((value: string) => void) | null>(null)
     // Track if we're expecting an export for history (user-initiated)
     const expectHistoryExportRef = useRef<boolean>(false)
+
+    // Yjs 协作状态
+    const [collaborationEnabled, setCollaborationEnabled] = useState(false)
+    const [collaborationRoomName, setCollaborationRoomName] =
+        useState<string>("")
+    const [collaborationIsReadOnly, setCollaborationIsReadOnly] =
+        useState(false)
+    const isUpdatingFromRemoteRef = useRef(false) // 防止循环更新
+
+    // 初始化 Yjs 协作 Hook
+    const {
+        isConnected: collaborationConnected,
+        userCount: collaborationUserCount,
+        pushUpdate,
+        getDocument,
+    } = useYjsCollaboration({
+        roomName: collaborationRoomName,
+        diagramId: collaborationRoomName, // 简化处理，使用 roomName 作为 diagramId
+        enabled: collaborationEnabled,
+        isReadOnly: collaborationIsReadOnly,
+        onRemoteChange: (xml) => {
+            // 远程更新：应用到 Draw.io
+            if (!isUpdatingFromRemoteRef.current && xml) {
+                console.log("[DiagramContext] Applying remote update")
+                isUpdatingFromRemoteRef.current = true
+                // 直接加载到 Draw.io，不触发 Yjs 推送
+                setChartXML(xml)
+                if (drawioRef.current) {
+                    drawioRef.current.load({ xml, skipValidation: true })
+                }
+                // 短暂延迟后重置标志
+                setTimeout(() => {
+                    isUpdatingFromRemoteRef.current = false
+                }, 100)
+            }
+        },
+    })
 
     const onDrawioLoad = () => {
         // Only set ready state once to prevent infinite loops
@@ -179,6 +226,16 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
         setChartXML(extractedXML)
         setLatestSvg(data.data)
 
+        // Yjs 协作：推送本地更新到服务器（如果不是远程更新触发的）
+        if (
+            collaborationEnabled &&
+            collaborationConnected &&
+            !isUpdatingFromRemoteRef.current
+        ) {
+            console.log("[DiagramContext] Pushing local update to Yjs")
+            pushUpdate(extractedXML)
+        }
+
         // Only add to history if this was a user-initiated export
         // Limit to 20 entries to prevent memory leaks during long sessions
         const MAX_HISTORY_SIZE = 20
@@ -308,6 +365,28 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
         }
     }
 
+    // 切换协作模式
+    const toggleCollaboration = useCallback(
+        (enabled: boolean, roomName?: string, isReadOnly?: boolean) => {
+            if (enabled && !roomName) {
+                console.warn(
+                    "[DiagramContext] Cannot enable collaboration without roomName",
+                )
+                return
+            }
+
+            console.log("[DiagramContext] Toggling collaboration:", {
+                enabled,
+                roomName,
+                isReadOnly,
+            })
+            setCollaborationEnabled(enabled)
+            setCollaborationRoomName(roomName || "")
+            setCollaborationIsReadOnly(isReadOnly || false)
+        },
+        [],
+    )
+
     return (
         <DiagramContext.Provider
             value={{
@@ -326,6 +405,11 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
                 onDrawioLoad,
                 resetDrawioReady,
                 registerExportCallback,
+                // Yjs 协作
+                collaborationEnabled,
+                collaborationConnected,
+                collaborationUserCount,
+                toggleCollaboration,
             }}
         >
             {children}
