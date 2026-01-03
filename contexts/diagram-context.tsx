@@ -72,7 +72,7 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
     } = useYjsCollaboration({
         roomName: collaborationRoomName,
         diagramId: collaborationRoomName, // 简化处理，使用 roomName 作为 diagramId
-        enabled: collaborationEnabled,
+        enabled: collaborationEnabled && !!collaborationRoomName, // 确保同时满足两个条件
         isReadOnly: collaborationIsReadOnly,
         onRemoteChange: (xml) => {
             // 远程更新：应用到 Draw.io

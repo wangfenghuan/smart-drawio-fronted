@@ -34,8 +34,27 @@ export function useYjsCollaboration({
     const [userCount, setUserCount] = useState(0)
     const collabRef = useRef<YjsCollaboration | null>(null)
 
+    console.log("[useYjsCollaboration] Hook state:", {
+        enabled,
+        roomName,
+        isConnected,
+        userCount,
+    })
+
     useEffect(() => {
+        console.log("[useYjsCollaboration] Effect triggered, conditions:", {
+            enabled,
+            roomName,
+            shouldInit: !!(enabled && roomName),
+        })
+
         if (!enabled || !roomName) {
+            console.log(
+                "[useYjsCollaboration] Skipping initialization - enabled:",
+                enabled,
+                ", roomName:",
+                roomName,
+            )
             return
         }
 

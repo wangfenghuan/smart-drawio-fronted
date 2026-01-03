@@ -55,10 +55,19 @@ export function CollaborationPanel() {
                 const returnedRoomId = String(response.data)
                 setRoomId(returnedRoomId)
 
+                console.log(
+                    "[CollaborationPanel] 房间创建成功，准备跳转。房间ID:",
+                    returnedRoomId,
+                )
+                console.log(
+                    "[CollaborationPanel] 目标URL:",
+                    `/diagram/edit/${diagramId}/room/${returnedRoomId}`,
+                )
+
                 // 跳转到协作路由：/diagram/edit/[id]/room/[roomId]
                 router.push(`/diagram/edit/${diagramId}/room/${returnedRoomId}`)
 
-                toast.success("协作已开启，可以邀请他人加入")
+                toast.success("协作已开启，正在跳转到协作房间...")
             } else {
                 toast.error(
                     "开启协作失败: " + (response?.message || "未知错误"),
@@ -247,8 +256,14 @@ export function CollaborationPanel() {
 
                     {/* 分享提示 */}
                     <div className="mb-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                        <p className="text-xs text-yellow-300">
+                        <p className="text-xs text-yellow-300 mb-1">
                             💡 分享房间 ID 给其他人以加入协作
+                        </p>
+                        <p className="text-xs text-gray-400">
+                            当前房间ID:{" "}
+                            <span className="font-mono text-white">
+                                {roomId}
+                            </span>
                         </p>
                     </div>
 
