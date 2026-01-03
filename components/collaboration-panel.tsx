@@ -15,7 +15,7 @@
 "use client"
 
 import { Lock, Unlock, Users, Wifi, WifiOff } from "lucide-react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 import { addRoom } from "@/api/roomController"
@@ -24,6 +24,7 @@ import { useDiagram } from "@/contexts/diagram-context"
 
 export function CollaborationPanel() {
     const { id: diagramId } = useParams()
+    const router = useRouter()
     const {
         collaborationEnabled,
         collaborationConnected,
@@ -54,15 +55,10 @@ export function CollaborationPanel() {
                 const returnedRoomId = String(response.data)
                 setRoomId(returnedRoomId)
 
-                // 启用协作连接
-                toggleCollaboration(true, returnedRoomId, isReadOnly)
-                setShowSettings(false)
+                // 跳转到协作路由：/diagram/edit/[id]/room/[roomId]
+                router.push(`/diagram/edit/${diagramId}/room/${returnedRoomId}`)
 
-                toast.success(
-                    collaborationEnabled
-                        ? "协作已开启"
-                        : "协作已开启，可以邀请他人加入",
-                )
+                toast.success("协作已开启，可以邀请他人加入")
             } else {
                 toast.error(
                     "开启协作失败: " + (response?.message || "未知错误"),
@@ -78,6 +74,12 @@ export function CollaborationPanel() {
 
     const handleStopCollaboration = () => {
         toggleCollaboration(false)
+
+        // 跳回个人编辑路由
+        if (diagramId) {
+            router.push(`/diagram/edit/${diagramId}`)
+        }
+
         toast.info("已停止协作")
     }
 
