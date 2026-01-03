@@ -48,7 +48,7 @@ export function CollaborationPanel() {
             // 调用后端 API 获取或创建房间（后端会自动判断是创建还是返回已有房间）
             const response = await addRoom({
                 roomName: `协作房间_${diagramId}`,
-                diagramId: parseInt(diagramId as string, 10),
+                diagramId: diagramId as string, // 直接使用字符串，避免精度丢失
             })
 
             if (response?.code === 0 && response?.data) {

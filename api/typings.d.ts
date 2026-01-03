@@ -421,7 +421,7 @@ declare namespace API {
         /** 房间名称 */
         roomName?: string
         /** 图表ID */
-        diagramId?: number
+        diagramId?: string
     }
 
     type RoomEditRequest = {
