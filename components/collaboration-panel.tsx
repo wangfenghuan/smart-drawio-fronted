@@ -55,15 +55,6 @@ export function CollaborationPanel() {
                 const returnedRoomId = String(response.data)
                 setRoomId(returnedRoomId)
 
-                console.log(
-                    "[CollaborationPanel] 房间创建成功，准备跳转。房间ID:",
-                    returnedRoomId,
-                )
-                console.log(
-                    "[CollaborationPanel] 目标URL:",
-                    `/diagram/edit/${diagramId}/room/${returnedRoomId}`,
-                )
-
                 // 跳转到协作路由：/diagram/edit/[id]/room/[roomId]
                 router.push(`/diagram/edit/${diagramId}/room/${returnedRoomId}`)
 

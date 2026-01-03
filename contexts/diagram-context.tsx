@@ -94,39 +94,20 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
         isReadOnly: collaborationIsReadOnly,
         onRemoteChange: (xml) => {
             // 远程更新：应用到 Draw.io
-            console.log(
-                "[DiagramContext] onRemoteChange called, xml length:",
-                xml?.length,
-            )
-            console.log(
-                "[DiagramContext] isUpdatingFromRemote:",
-                isUpdatingFromRemoteRef.current,
-            )
-
             if (!isUpdatingFromRemoteRef.current && xml) {
-                console.log(
-                    "[DiagramContext] Applying remote update to Draw.io",
-                )
                 isUpdatingFromRemoteRef.current = true
                 // 直接加载到 Draw.io，不触发 Yjs 推送
                 setChartXML(xml)
 
                 if (drawioRef.current) {
-                    console.log("[DiagramContext] Loading XML into Draw.io...")
                     try {
                         drawioRef.current.load({
                             xml: xml,
                         })
-                        console.log(
-                            "[DiagramContext] XML load command sent, waiting for render...",
-                        )
 
                         // 延迟重置标志，确保 Draw.io 完成渲染
                         setTimeout(() => {
                             isUpdatingFromRemoteRef.current = false
-                            console.log(
-                                "[DiagramContext] Reset isUpdatingFromRemote flag after 500ms",
-                            )
                         }, 500)
                     } catch (error) {
                         console.error(
@@ -141,13 +122,6 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
                     )
                     isUpdatingFromRemoteRef.current = false
                 }
-            } else {
-                console.log(
-                    "[DiagramContext] Skipping remote update - isUpdating:",
-                    isUpdatingFromRemoteRef.current,
-                    ", hasXml:",
-                    !!xml,
-                )
             }
         },
     })
@@ -231,10 +205,6 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
             }
             // Use fixed XML if auto-fix was applied
             if (validation.fixed) {
-                console.log(
-                    "[loadDiagram] Auto-fixed XML issues:",
-                    validation.fixes,
-                )
                 xmlToLoad = validation.fixed
             }
         }
@@ -282,9 +252,6 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
                 (dataStr.startsWith("<svg") && !dataStr.includes("content="))
             ) {
                 // This is a raw PNG or SVG export, don't try to extract XML
-                console.log(
-                    "[handleDiagramExport] Skipping XML extraction for raw PNG/SVG export",
-                )
                 return
             }
 
@@ -297,30 +264,12 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
             const currentEnabled = collaborationStateRef.current.enabled
             const currentConnected = collaborationStateRef.current.connected
 
-            console.log(
-                "[handleDiagramExport] Checking if should push to Yjs:",
-                {
-                    collaborationEnabled: currentEnabled,
-                    collaborationConnected: currentConnected,
-                    isUpdatingFromRemote: isUpdatingFromRemoteRef.current,
-                    xmlLength: extractedXML?.length,
-                },
-            )
-
             if (
                 currentEnabled &&
                 currentConnected &&
                 !isUpdatingFromRemoteRef.current
             ) {
-                console.log(
-                    "[DiagramContext] Pushing local update to Yjs, XML length:",
-                    extractedXML.length,
-                )
                 pushUpdate(extractedXML)
-            } else {
-                console.log(
-                    "[DiagramContext] Skipping Yjs push - collaboration disabled or remote update in progress",
-                )
             }
 
             // Only add to history if this was a user-initiated export
@@ -348,13 +297,6 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
         },
         [pushUpdate], // 只依赖 pushUpdate，状态从 ref 读取
     )
-
-    // 添加日志来确认依赖项的值
-    console.log("[DiagramContext] handleDiagramExport dependencies:", {
-        collaborationEnabled,
-        collaborationConnected,
-        pushUpdate: typeof pushUpdate,
-    })
 
     const clearDiagram = () => {
         const emptyDiagram = `<mxfile><diagram name="Page-1" id="page-1"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel></diagram></mxfile>`
@@ -471,11 +413,6 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
                 return
             }
 
-            console.log("[DiagramContext] Toggling collaboration:", {
-                enabled,
-                roomName,
-                isReadOnly,
-            })
             setCollaborationEnabled(enabled)
             setCollaborationRoomName(roomName || "")
             setCollaborationIsReadOnly(isReadOnly || false)

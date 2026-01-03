@@ -89,14 +89,12 @@ export class YjsCollaboration {
 
             // 监听连接状态
             this.provider.on("status", (event: { status: string }) => {
-                console.log("[Yjs] WebSocket status:", event.status)
                 this.options.onConnectionStatusChange?.(
                     event.status as "connecting" | "connected" | "disconnected",
                 )
 
                 // 如果连接成功，标记为已同步（允许立即推送）
                 if (event.status === "connected" && !this.isSynced) {
-                    console.log("[Yjs] Connected, marking as synced")
                     this.isSynced = true
                 }
             })
@@ -104,11 +102,6 @@ export class YjsCollaboration {
             // 监听同步状态
             this.provider.on("sync", (event: { status: boolean }) => {
                 if (event.status) {
-                    console.log(
-                        "[Yjs] Document synced, initial content length:",
-                        this.ytext.toString().length,
-                    )
-
                     // 标记同步完成
                     this.isSynced = true
 
@@ -117,16 +110,10 @@ export class YjsCollaboration {
 
                     if (serverHasData) {
                         // 服务器有数据，使用服务器数据
-                        console.log(
-                            "[Yjs] Server has data, applying remote content",
-                        )
                         this.lastXML = this.ytext.toString()
                         this.options.onRemoteChange?.(this.lastXML)
                     } else {
                         // 服务器没有数据，推送本地数据
-                        console.log(
-                            "[Yjs] Server has no data, pushing local content",
-                        )
                         if (this.lastXML) {
                             this.pushLocalUpdate(this.lastXML)
                         }
@@ -147,21 +134,9 @@ export class YjsCollaboration {
                 // 检查是否是本地更新（通过 transaction.origin 判断）
                 const isLocalUpdate = event.transaction.origin === this.provider
 
-                console.log("[Yjs] ytext.observe triggered", {
-                    isLocalUpdate,
-                    origin: event.transaction.origin,
-                    provider: this.provider,
-                    hasCallback: !!this.options.onRemoteChange,
-                })
-
                 // 只处理远程更新
                 if (!isLocalUpdate) {
                     const newXML = this.ytext.toString()
-                    console.log(
-                        "[Yjs] Remote update received, length:",
-                        newXML.length,
-                    )
-                    console.log("[Yjs] Calling onRemoteChange callback...")
 
                     // 防抖处理，避免频繁更新
                     if (this.syncTimeout) {
@@ -170,12 +145,7 @@ export class YjsCollaboration {
 
                     this.syncTimeout = setTimeout(() => {
                         this.lastXML = newXML
-                        console.log(
-                            "[Yjs] Executing onRemoteChange callback with XML length:",
-                            newXML.length,
-                        )
                         this.options.onRemoteChange?.(newXML)
-                        console.log("[Yjs] onRemoteChange callback executed")
                     }, 100)
                 }
 
@@ -183,11 +153,6 @@ export class YjsCollaboration {
                 this.updateCount++
                 this.checkAndUploadSnapshot()
             })
-
-            console.log(
-                "[Yjs] Collaboration initialized for room:",
-                this.roomName,
-            )
         } catch (error) {
             console.error("[Yjs] Initialization error:", error)
         }
@@ -216,9 +181,6 @@ export class YjsCollaboration {
      */
     private async checkAndUploadSnapshot() {
         if (this.updateCount >= YJS_CONFIG.SNAPSHOT_THRESHOLD) {
-            console.log(
-                "[Yjs] Update count reached threshold, checking snapshot lock...",
-            )
             const success = await this.tryUploadSnapshot()
             if (success) {
                 this.updateCount = 0
@@ -237,13 +199,8 @@ export class YjsCollaboration {
             })
 
             if (!lockResult) {
-                console.log(
-                    "[Yjs] Another client is uploading snapshot, skipping...",
-                )
                 return false
             }
-
-            console.log("[Yjs] Acquired snapshot lock, uploading...")
 
             // 2. 获取当前文档状态（Yjs 状态向量）
             const state = Y.encodeStateAsUpdate(this.ydoc)
@@ -258,7 +215,6 @@ export class YjsCollaboration {
             )
 
             if (uploadResult) {
-                console.log("[Yjs] Snapshot uploaded successfully")
                 return true
             } else {
                 console.error("[Yjs] Snapshot upload failed")
@@ -310,7 +266,6 @@ export class YjsCollaboration {
             this.provider.destroy()
         }
         this.ydoc.destroy()
-        console.log("[Yjs] Collaboration disposed")
     }
 }
 

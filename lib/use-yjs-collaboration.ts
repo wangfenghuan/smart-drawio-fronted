@@ -34,31 +34,10 @@ export function useYjsCollaboration({
     const [userCount, setUserCount] = useState(0)
     const collabRef = useRef<YjsCollaboration | null>(null)
 
-    console.log("[useYjsCollaboration] Hook state:", {
-        enabled,
-        roomName,
-        isConnected,
-        userCount,
-    })
-
     useEffect(() => {
-        console.log("[useYjsCollaboration] Effect triggered, conditions:", {
-            enabled,
-            roomName,
-            shouldInit: !!(enabled && roomName),
-        })
-
         if (!enabled || !roomName) {
-            console.log(
-                "[useYjsCollaboration] Skipping initialization - enabled:",
-                enabled,
-                ", roomName:",
-                roomName,
-            )
             return
         }
-
-        console.log("[useYjsCollaboration] Initializing for room:", roomName)
 
         // 创建协作实例
         const collab = createCollaboration({
@@ -66,15 +45,12 @@ export function useYjsCollaboration({
             diagramId,
             isReadOnly,
             onRemoteChange: (xml) => {
-                console.log("[useYjsCollaboration] Remote change received")
                 onRemoteChange?.(xml)
             },
             onConnectionStatusChange: (status) => {
-                console.log("[useYjsCollaboration] Connection status:", status)
                 setIsConnected(status === "connected")
             },
             onUserCountChange: (count) => {
-                console.log("[useYjsCollaboration] User count:", count)
                 setUserCount(count)
             },
         })
@@ -83,7 +59,6 @@ export function useYjsCollaboration({
 
         // 清理函数
         return () => {
-            console.log("[useYjsCollaboration] Cleaning up...")
             collab.dispose()
             collabRef.current = null
         }
@@ -94,15 +69,9 @@ export function useYjsCollaboration({
      */
     const pushUpdate = (xml: string) => {
         const readyToPush = collabRef.current?.isReadyToPush() || false
-        console.log(
-            "[useYjsCollaboration] pushUpdate called, readyToPush:",
-            readyToPush,
-        )
 
         if (collabRef.current && readyToPush) {
             collabRef.current.pushLocalUpdate(xml)
-        } else {
-            console.log("[useYjsCollaboration] Skipping push - not ready yet")
         }
     }
 
