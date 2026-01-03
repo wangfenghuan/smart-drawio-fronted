@@ -90,7 +90,7 @@ declare namespace API {
     }
 
     type checkLockParams = {
-        roomId: number
+        roomId: string | number
     }
 
     type Conversion = {
@@ -491,7 +491,7 @@ declare namespace API {
     }
 
     type uploadSnapshotParams = {
-        roomId: number
+        roomId: string | number
     }
 
     type User = {

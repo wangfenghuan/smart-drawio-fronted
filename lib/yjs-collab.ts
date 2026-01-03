@@ -214,7 +214,7 @@ export class YjsCollaboration {
 
             // 3. 上传快照（使用现有的后端接口）
             const uploadResult = await uploadSnapshot(
-                { roomId: parseInt(this.roomName) },
+                { roomId: this.roomName }, // 直接使用字符串，避免精度丢失
                 base64Data,
             )
 
