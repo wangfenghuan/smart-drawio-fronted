@@ -6,7 +6,7 @@ import { fileURLToPath } from "url"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const require = createRequire(import.meta.url)
+const _require = createRequire(import.meta.url)
 
 let mainWindow: BrowserWindow | null = null
 let nextjsProcess: any = null

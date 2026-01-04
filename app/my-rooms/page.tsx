@@ -4,9 +4,10 @@ import {
     ClockCircleOutlined,
     DeleteOutlined,
     EditOutlined,
-    FileTextOutlined,
     PlusOutlined,
     SearchOutlined,
+    TeamOutlined,
+    UserOutlined,
 } from "@ant-design/icons"
 import {
     App,
@@ -23,21 +24,20 @@ import {
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import {
-    deleteDiagram,
-    downloadRemoteFile,
-    editDiagram,
-    listMyDiagramVoByPage,
-} from "@/api/diagramController"
+    deleteDiagramRoom,
+    editDiagramRoom,
+    listMyDiagramRoomVoByPage,
+} from "@/api/roomController"
 
 const { Search } = Input
 const { TextArea } = Input
 
-export default function MyDiagramsPage() {
-    // 使用 App 包裹获取上下文 message，避免静态方法警告
+export default function MyRoomsPage() {
+    // 使用 App 包裹获取上下文 message
     const { message } = App.useApp()
     const router = useRouter()
 
-    const [diagrams, setDiagrams] = useState<API.DiagramVO[]>([])
+    const [rooms, setRooms] = useState<API.RoomVO[]>([])
     const [loading, setLoading] = useState(false)
     const [pagination, setPagination] = useState({
         current: 1,
@@ -47,19 +47,17 @@ export default function MyDiagramsPage() {
 
     const [searchText, setSearchText] = useState("")
     const [editModalVisible, setEditModalVisible] = useState(false)
-    const [editingDiagram, setEditingDiagram] = useState<API.DiagramVO | null>(
-        null,
-    )
+    const [editingRoom, setEditingRoom] = useState<API.RoomVO | null>(null)
     const [editForm] = Form.useForm()
 
-    // 加载图表列表
-    const loadDiagrams = async (
+    // 加载房间列表
+    const loadRooms = async (
         current = pagination.current,
         pageSize = pagination.pageSize,
     ) => {
         setLoading(true)
         try {
-            const response = await listMyDiagramVoByPage({
+            const response = await listMyDiagramRoomVoByPage({
                 current: current,
                 pageSize: pageSize,
                 ...(searchText && { searchText: searchText }),
@@ -71,25 +69,20 @@ export default function MyDiagramsPage() {
                 const data = response.data
                 const records = data.records || []
 
-                // 后端返回的 Long 类型字段可能是 String，需要显式转换
                 const serverCurrent = Number(data.current) || 1
                 const serverSize = Number(data.size) || 12
                 let serverTotal = Number(data.total) || 0
 
-                // 修正逻辑：如果后端返回 total 为 0，但 records 有数据
-                // 说明后端可能没有执行 count 查询或返回了所有数据
                 if (serverTotal === 0 && records.length > 0) {
-                    // 如果当前页数据量大于 pageSize，说明可能是一次性返回了所有数据（后端分页失效）
                     if (records.length > serverSize) {
                         serverTotal = records.length
                     } else {
-                        // 估算一个 total，确保分页器能显示
                         serverTotal =
                             (serverCurrent - 1) * serverSize + records.length
                     }
                 }
 
-                setDiagrams(records)
+                setRooms(records)
                 setPagination({
                     current: serverCurrent,
                     pageSize: serverSize,
@@ -97,11 +90,11 @@ export default function MyDiagramsPage() {
                 })
             } else {
                 message.error(
-                    "获取图表列表失败：" + (response?.message || "未知错误"),
+                    "获取房间列表失败：" + (response?.message || "未知错误"),
                 )
             }
         } catch (error) {
-            console.error("加载图表列表失败:", error)
+            console.error("加载房间列表失败:", error)
             message.error("系统繁忙，请稍后重试")
         } finally {
             setLoading(false)
@@ -110,58 +103,57 @@ export default function MyDiagramsPage() {
 
     // 初始加载
     useEffect(() => {
-        loadDiagrams()
+        loadRooms()
     }, [])
 
     // 搜索触发
     const handleSearch = (value: string) => {
         setSearchText(value)
-        // 搜索时重置回第一页
         setPagination((prev) => ({ ...prev, current: 1 }))
-        loadDiagrams(1, pagination.pageSize)
+        loadRooms(1, pagination.pageSize)
     }
 
     // 分页、页大小变化触发
     const handleTableChange = (page: number, pageSize: number) => {
-        // 更新状态并重新加载
         setPagination({ ...pagination, current: page, pageSize })
-        loadDiagrams(page, pageSize)
+        loadRooms(page, pageSize)
     }
 
-    // 跳转到编辑页面
-    const handleEditDiagram = (id: string | undefined) => {
-        if (id) {
-            router.push(`/diagram/edit/${id}`)
+    // 跳转到协作编辑页面
+    const handleJoinRoom = (roomId: string | undefined) => {
+        if (roomId) {
+            router.push(`/diagram/edit/${roomId}/room/${roomId}`)
         }
     }
 
-    // 删除图表
-    const handleDeleteDiagram = async (id: string | undefined) => {
+    // 删除房间
+    const handleDeleteRoom = async (id: string | undefined) => {
         if (!id) return
 
         try {
-            // 注意：deleteDiagram 如果接受 Number，需要把 id 转为 number
-            // 如果后端接受 String id，则无需 Number()
-            const response = await deleteDiagram({ id: id as any })
+            // 后端 DeleteRequest 接受单个 id (number)
+            const response = await deleteDiagramRoom({
+                id: parseInt(id, 10) as any,
+            })
             if (response?.code === 0) {
                 message.success("删除成功")
-                // 删除后刷新当前页
-                loadDiagrams()
+                loadRooms()
             } else {
                 message.error(response?.message || "删除失败")
             }
         } catch (error) {
-            console.error("删除图表失败:", error)
+            console.error("删除房间失败:", error)
             message.error("删除操作异常")
         }
     }
 
     // 打开编辑模态框
-    const handleOpenEditModal = (diagram: API.DiagramVO) => {
-        setEditingDiagram(diagram)
+    const handleOpenEditModal = (room: API.RoomVO) => {
+        setEditingRoom(room)
         editForm.setFieldsValue({
-            name: diagram.name, // 注意：后端返回字段是 name 还是 diagramName？根据您的JSON是 name
-            description: diagram.description, // 您的JSON里没有 description，注意检查
+            roomName: room.roomName,
+            isPublic: room.isPublic,
+            isOpen: room.isOpen,
         })
         setEditModalVisible(true)
     }
@@ -170,49 +162,23 @@ export default function MyDiagramsPage() {
     const handleSaveEdit = async () => {
         try {
             const values = await editForm.validateFields()
-            const response = await editDiagram({
-                id: editingDiagram?.id,
+            const response = await editDiagramRoom({
+                id: editingRoom?.id,
                 ...values,
             })
 
             if (response?.code === 0) {
                 message.success("保存成功")
                 setEditModalVisible(false)
-                loadDiagrams()
+                loadRooms()
             } else {
                 message.error(response?.message || "保存失败")
             }
         } catch (error) {
             console.error("保存失败:", error)
-            // 如果是表单校验失败，不需要弹窗提示
             if (!error.errorFields) {
                 message.error("保存失败")
             }
-        }
-    }
-
-    // 下载图表 (保持原样，如有需要可增加 svg/png 选择逻辑)
-    const _handleDownload = async (diagram: API.DiagramVO) => {
-        try {
-            const response = await downloadRemoteFile({
-                id: diagram.id,
-                type: "svg", // 默认下载 svg
-            })
-            // 处理 Blob 下载逻辑...
-            if (response) {
-                const url = window.URL.createObjectURL(new Blob([response]))
-                const link = document.createElement("a")
-                link.href = url
-                link.download = `${diagram.name || "diagram"}.svg`
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-                window.URL.revokeObjectURL(url)
-                message.success("下载成功")
-            }
-        } catch (error) {
-            console.error("下载失败:", error)
-            message.error("下载失败")
         }
     }
 
@@ -236,20 +202,20 @@ export default function MyDiagramsPage() {
                                 gap: "16px",
                             }}
                         >
-                            <FileTextOutlined
+                            <TeamOutlined
                                 style={{ fontSize: "20px", color: "#1890ff" }}
                             />
                             <span style={{ fontSize: "18px", fontWeight: 600 }}>
-                                我的图表
+                                我的协作房间
                             </span>
                         </div>
                         <Button
                             type="primary"
                             icon={<PlusOutlined />}
-                            onClick={() => router.push("/")} // 假设新建在首页或特定路由
+                            onClick={() => router.push("/my-diagrams")}
                             style={{ borderRadius: "6px" }}
                         >
-                            新建图表
+                            新建房间
                         </Button>
                     </div>
                 }
@@ -257,7 +223,7 @@ export default function MyDiagramsPage() {
                 {/* 搜索栏 */}
                 <div style={{ marginBottom: "24px" }}>
                     <Search
-                        placeholder="搜索图表名称..."
+                        placeholder="搜索房间名称..."
                         allowClear
                         enterButton={
                             <Button icon={<SearchOutlined />}>搜索</Button>
@@ -268,7 +234,7 @@ export default function MyDiagramsPage() {
                     />
                 </div>
 
-                {/* 图表列表 Grid */}
+                {/* 房间列表 Grid */}
                 <div
                     style={{
                         display: "grid",
@@ -289,7 +255,7 @@ export default function MyDiagramsPage() {
                                 />
                             ),
                         )
-                    ) : diagrams.length === 0 ? (
+                    ) : rooms.length === 0 ? (
                         <div
                             style={{
                                 gridColumn: "1 / -1",
@@ -308,22 +274,33 @@ export default function MyDiagramsPage() {
                                                 color: "#666",
                                             }}
                                         >
-                                            暂无图表
+                                            暂无协作房间
+                                        </p>
+                                        <p
+                                            style={{
+                                                fontSize: "14px",
+                                                color: "#999",
+                                                marginBottom: "16px",
+                                            }}
+                                        >
+                                            在图表编辑页面开启协作后，房间会自动显示在这里
                                         </p>
                                         <Button
-                                            type="link"
-                                            onClick={() => router.push("/")}
+                                            type="primary"
+                                            onClick={() =>
+                                                router.push("/my-diagrams")
+                                            }
                                         >
-                                            去创建第一个图表
+                                            去创建第一个协作房间
                                         </Button>
                                     </div>
                                 }
                             />
                         </div>
                     ) : (
-                        diagrams.map((diagram) => (
+                        rooms.map((room) => (
                             <Card
-                                key={diagram.id}
+                                key={room.id}
                                 hoverable
                                 style={{
                                     borderRadius: "8px",
@@ -331,7 +308,7 @@ export default function MyDiagramsPage() {
                                 }}
                                 bodyStyle={{ padding: "16px" }}
                                 onClick={() =>
-                                    handleEditDiagram(diagram.id?.toString())
+                                    handleJoinRoom(room.id?.toString())
                                 }
                             >
                                 <div style={{ marginBottom: "12px" }}>
@@ -344,32 +321,10 @@ export default function MyDiagramsPage() {
                                             textOverflow: "ellipsis",
                                             whiteSpace: "nowrap",
                                         }}
-                                        title={diagram.name}
+                                        title={room.roomName}
                                     >
-                                        {diagram.name || "未命名图表"}
+                                        {room.roomName || "未命名房间"}
                                     </h3>
-                                    {/* 兼容 description 字段，如果后端未返回则不显示 */}
-                                    {diagram.description ? (
-                                        <p
-                                            style={{
-                                                fontSize: "13px",
-                                                color: "#666",
-                                                marginBottom: "12px",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                                whiteSpace: "nowrap",
-                                            }}
-                                        >
-                                            {diagram.description}
-                                        </p>
-                                    ) : (
-                                        <div
-                                            style={{
-                                                height: "13px",
-                                                marginBottom: "12px",
-                                            }}
-                                        ></div>
-                                    )}
                                     <div
                                         style={{
                                             display: "flex",
@@ -377,46 +332,74 @@ export default function MyDiagramsPage() {
                                             gap: "8px",
                                             fontSize: "12px",
                                             color: "#999",
+                                            marginBottom: "12px",
                                         }}
                                     >
                                         <ClockCircleOutlined />
                                         <span>
-                                            {diagram.createTime
+                                            {room.createTime
                                                 ? new Date(
-                                                      diagram.createTime,
+                                                      room.createTime,
                                                   ).toLocaleString()
                                                 : "未知时间"}
                                         </span>
                                     </div>
                                 </div>
 
-                                {/* 缩略图区域 */}
+                                {/* 房间信息卡片 */}
                                 <div
                                     style={{
                                         marginBottom: "12px",
-                                        height: "140px",
+                                        padding: "12px",
                                         borderRadius: "6px",
-                                        background: "#f5f5f5",
+                                        background: "#f0f2f5",
                                         display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        overflow: "hidden",
+                                        flexDirection: "column",
+                                        gap: "8px",
                                     }}
                                 >
-                                    <img
-                                        src={
-                                            diagram.pictureUrl ||
-                                            diagram.svgUrl ||
-                                            // 默认占位图
-                                            "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='%23d9d9d9' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'/%3E%3Cpolyline points='21 15 16 10 5 21'/%3E%3C/svg%3E"
-                                        }
-                                        alt={diagram.name}
+                                    <div
                                         style={{
-                                            maxWidth: "100%",
-                                            maxHeight: "100%",
-                                            objectFit: "contain",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "6px",
+                                            fontSize: "12px",
+                                            color: "#666",
                                         }}
-                                    />
+                                    >
+                                        <UserOutlined />
+                                        <span
+                                            style={{
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                                flex: 1,
+                                            }}
+                                        >
+                                            创建者ID: {room.ownerId || "未知"}
+                                        </span>
+                                    </div>
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "6px",
+                                            fontSize: "12px",
+                                            color: "#666",
+                                        }}
+                                    >
+                                        <TeamOutlined />
+                                        <span
+                                            style={{
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                                flex: 1,
+                                            }}
+                                        >
+                                            房间 ID: {room.id || "-"}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 {/* 操作按钮区 */}
@@ -427,23 +410,37 @@ export default function MyDiagramsPage() {
                                         justifyContent: "flex-end",
                                     }}
                                 >
+                                    <Tooltip title="进入协作">
+                                        <Button
+                                            type="primary"
+                                            size="small"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleJoinRoom(
+                                                    room.id?.toString(),
+                                                )
+                                            }}
+                                        >
+                                            进入
+                                        </Button>
+                                    </Tooltip>
                                     <Tooltip title="修改信息">
                                         <Button
                                             size="small"
                                             icon={<EditOutlined />}
                                             onClick={(e) => {
                                                 e.stopPropagation()
-                                                handleOpenEditModal(diagram)
+                                                handleOpenEditModal(room)
                                             }}
                                         />
                                     </Tooltip>
                                     <Popconfirm
-                                        title="删除图表"
-                                        description="确定要永久删除这个图表吗？"
+                                        title="删除房间"
+                                        description="确定要删除这个协作房间吗？删除后协 作数据将无法恢复。"
                                         onConfirm={(e) => {
                                             e?.stopPropagation()
-                                            handleDeleteDiagram(
-                                                diagram.id?.toString(),
+                                            handleDeleteRoom(
+                                                room.id?.toString(),
                                             )
                                         }}
                                         onCancel={(e) => e?.stopPropagation()}
@@ -489,7 +486,7 @@ export default function MyDiagramsPage() {
 
             {/* 编辑信息模态框 */}
             <Modal
-                title="编辑图表信息"
+                title="编辑房间信息"
                 open={editModalVisible}
                 onOk={handleSaveEdit}
                 onCancel={() => setEditModalVisible(false)}
@@ -499,14 +496,25 @@ export default function MyDiagramsPage() {
             >
                 <Form form={editForm} layout="vertical" preserve={false}>
                     <Form.Item
-                        label="图表名称"
-                        name="name"
-                        rules={[{ required: true, message: "请输入图表名称" }]}
+                        label="房间名称"
+                        name="roomName"
+                        rules={[{ required: true, message: "请输入房间名称" }]}
                     >
-                        <Input placeholder="请输入图表名称" />
+                        <Input placeholder="请输入房间名称" />
                     </Form.Item>
-                    <Form.Item label="描述" name="description">
-                        <TextArea rows={4} placeholder="请输入描述" />
+                    <Form.Item
+                        label="是否公开"
+                        name="isPublic"
+                        tooltip="0=公开，任何人可见；1=私有，仅创建者可见"
+                    >
+                        <Input type="number" placeholder="0=公开, 1=私有" />
+                    </Form.Item>
+                    <Form.Item
+                        label="是否开启"
+                        name="isOpen"
+                        tooltip="0=开启，正常使用；1=关闭，暂停服务"
+                    >
+                        <Input type="number" placeholder="0=开启, 1=关闭" />
                     </Form.Item>
                 </Form>
             </Modal>

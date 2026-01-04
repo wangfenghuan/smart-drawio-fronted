@@ -12,7 +12,9 @@ import {
 import type { DrawIoEmbedRef } from "react-drawio"
 import { STORAGE_DIAGRAM_XML_KEY } from "@/components/chat-panel"
 import type { ExportFormat } from "@/components/save-dialog"
-import { useYjsCollaboration } from "../lib/use-yjs-collaboration"
+import { generateSecretKey, getSecretKeyFromHash } from "../lib/cryptoUtils"
+import { usePersistence } from "../lib/use-persistence"
+import { useWebSocketCollaboration } from "../lib/use-websocket-collaboration"
 import { extractDiagramXML, validateAndFixXml } from "../lib/utils"
 
 interface DiagramContextType {
@@ -63,12 +65,11 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
     // Track if we're expecting an export for history (user-initiated)
     const expectHistoryExportRef = useRef<boolean>(false)
 
-    // Yjs 协作状态
+    // WebSocket 协作状态
     const [collaborationEnabled, setCollaborationEnabled] = useState(false)
     const [collaborationRoomName, setCollaborationRoomName] =
         useState<string>("")
-    const [collaborationIsReadOnly, setCollaborationIsReadOnly] =
-        useState(false)
+    const [secretKey, setSecretKey] = useState<string>("")
     const isUpdatingFromRemoteRef = useRef(false) // 防止循环更新
 
     // 使用 ref 存储最新的协作状态，避免闭包陷阱
@@ -82,17 +83,33 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
         collaborationStateRef.current.enabled = collaborationEnabled
     }, [collaborationEnabled])
 
-    // 初始化 Yjs 协作 Hook
+    // 初始化密钥: 从 URL hash 获取或生成新密钥
+    useEffect(() => {
+        const key = getSecretKeyFromHash()
+        if (key) {
+            console.log("[DiagramContext] 🔑 Loaded secret key from URL hash")
+            setSecretKey(key)
+        } else {
+            const newKey = generateSecretKey()
+            console.log("[DiagramContext] 🔑 Generated new secret key")
+            setSecretKey(newKey)
+            // 将密钥添加到 URL hash(如果启用了协作)
+            if (collaborationEnabled) {
+                window.location.hash = `key=${newKey}`
+            }
+        }
+    }, [collaborationEnabled])
+
+    // 初始化 WebSocket 协作 Hook（Excalidraw 风格）
     const {
         isConnected: collaborationConnected,
         userCount: collaborationUserCount,
         pushUpdate,
         getDocument,
-    } = useYjsCollaboration({
+    } = useWebSocketCollaboration({
         roomName: collaborationRoomName,
-        diagramId: collaborationRoomName, // 简化处理，使用 roomName 作为 diagramId
-        enabled: collaborationEnabled && !!collaborationRoomName, // 确保同时满足两个条件
-        isReadOnly: collaborationIsReadOnly,
+        secretKey: secretKey, // 传入密钥用于加密/解密
+        enabled: collaborationEnabled && !!collaborationRoomName && !!secretKey, // 确保同时满足三个条件
         onRemoteChange: (xml) => {
             // 远程更新：应用到 Draw.io
             console.log("[DiagramContext] 🔔 onRemoteChange called!", {
@@ -115,7 +132,7 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
                     "[DiagramContext] 📥 Loading remote XML to Draw.io...",
                 )
 
-                // 直接加载到 Draw.io，不触发 Yjs 推送
+                // 直接加载到 Draw.io，不触发 WebSocket 推送
                 setChartXML(xml)
 
                 if (drawioRef.current) {
@@ -159,6 +176,34 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         collaborationStateRef.current.connected = collaborationConnected
     }, [collaborationConnected])
+
+    // HTTP 持久化 (Excalidraw 风格)
+    // 只在协作模式下启用,与 WebSocket 广播分离
+    const { flush: flushPersistence } = usePersistence({
+        roomId: collaborationRoomName,
+        secretKey: secretKey,
+        xml: chartXML,
+        enabled: collaborationEnabled && !!collaborationRoomName && !!secretKey,
+        debounceMs: 2000,
+        onSaveSuccess: () => {
+            console.log("[DiagramContext] 💾 Auto-saved to backend")
+        },
+        onSaveError: (error) => {
+            console.error("[DiagramContext] ❌ Auto-save failed:", error)
+        },
+    })
+
+    // 组件卸载时刷新未保存的更改
+    useEffect(() => {
+        return () => {
+            if (collaborationEnabled) {
+                console.log(
+                    "[DiagramContext] 💾 Flushing persistence on unmount...",
+                )
+                flushPersistence()
+            }
+        }
+    }, [collaborationEnabled, flushPersistence])
 
     const onDrawioLoad = () => {
         // Only set ready state once to prevent infinite loops
@@ -476,11 +521,10 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
 
     // 切换协作模式
     const toggleCollaboration = useCallback(
-        (enabled: boolean, roomName?: string, isReadOnly?: boolean) => {
+        (enabled: boolean, roomName?: string, _isReadOnly?: boolean) => {
             console.log("[DiagramContext] toggleCollaboration called:", {
                 enabled,
                 roomName,
-                isReadOnly,
             })
 
             if (enabled && !roomName) {
@@ -501,7 +545,7 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
 
             setCollaborationEnabled(enabled)
             setCollaborationRoomName(roomName || "")
-            setCollaborationIsReadOnly(isReadOnly || false)
+            // isReadOnly 参数已废弃，保留兼容性但不使用
         },
         [],
     )

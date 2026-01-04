@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execSync } from "child_process"
-import { copyFileSync, existsSync, mkdirSync } from "fs"
+import { existsSync, mkdirSync } from "fs"
 import { dirname, join } from "path"
 import { fileURLToPath } from "url"
 
@@ -21,7 +21,7 @@ try {
 
 console.log("\n🔧 Step 2: Preparing Electron build...")
 const outDir = join(projectRoot, "out")
-const electronDir = join(projectRoot, "electron")
+const _electronDir = join(projectRoot, "electron")
 
 if (!existsSync(outDir)) {
     console.error(

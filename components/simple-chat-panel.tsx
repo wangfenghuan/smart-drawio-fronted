@@ -19,11 +19,7 @@ import remarkGfm from "remark-gfm"
 import { toast } from "sonner"
 import { listDiagramChatHistory } from "@/api/conversionController"
 import type { API } from "@/api/typings"
-import {
-    type AIConfig,
-    AIConfigDialog,
-    useAIConfig,
-} from "@/components/ai-config-dialog"
+import { AIConfigDialog, useAIConfig } from "@/components/ai-config-dialog"
 import { CodeBlock } from "@/components/code-block"
 import { DownloadDialog } from "@/components/download-dialog"
 import { removeThinkingTags, ThinkingBlock } from "@/components/thinking-block"

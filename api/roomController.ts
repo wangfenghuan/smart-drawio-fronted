@@ -2,6 +2,25 @@
 /* eslint-disable */
 import request from "@/lib/request"
 
+/** 此处后端没有提供注释 POST /room/${param0}/save */
+export async function save(
+    // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+    params: API.saveParams,
+    body: string,
+    options?: { [key: string]: any },
+) {
+    const { roomId: param0, ...queryParams } = params
+    return request<API.BaseResponseBoolean>(`/room/${param0}/save`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        params: { ...queryParams },
+        data: body,
+        ...(options || {}),
+    })
+}
+
 /** 创建房间 POST /room/add */
 export async function addRoom(
     body: API.RoomAddRequest,
@@ -58,34 +77,6 @@ export async function getDiagramRoomVoById(
         params: {
             ...params,
         },
-        ...(options || {}),
-    })
-}
-
-/** 此处后端没有提供注释 GET /room/getByDiagramId/${param0} */
-export async function getRoomByDiagramId(
-    // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-    params: API.getRoomByDiagramIdParams,
-    options?: { [key: string]: any },
-) {
-    const { diagramId: param0, ...queryParams } = params
-    return request<API.BaseResponseRoomVO>(`/room/getByDiagramId/${param0}`, {
-        method: "GET",
-        params: { ...queryParams },
-        ...(options || {}),
-    })
-}
-
-/** 此处后端没有提供注释 GET /room/isContained/${param0} */
-export async function isContained(
-    // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-    params: API.isContainedParams,
-    options?: { [key: string]: any },
-) {
-    const { roomId: param0, ...queryParams } = params
-    return request<API.BaseResponseBoolean>(`/room/isContained/${param0}`, {
-        method: "GET",
-        params: { ...queryParams },
         ...(options || {}),
     })
 }

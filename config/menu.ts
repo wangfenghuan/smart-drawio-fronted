@@ -1,5 +1,4 @@
 import type { MenuDataItem } from "@ant-design/pro-layout"
-import accessEnum from "@/access/accessEnum"
 
 const menus: MenuDataItem[] = [
     {
@@ -9,6 +8,10 @@ const menus: MenuDataItem[] = [
     {
         path: "/my-diagrams",
         name: "我的图表",
+    },
+    {
+        path: "/my-rooms",
+        name: "我的协作房间",
     },
     {
         path: "/diagrams",
@@ -32,7 +35,7 @@ const menus: MenuDataItem[] = [
             },
             {
                 path: "/admin/room",
-                name: "题目管理",
+                name: "房间管理",
             },
         ],
     },

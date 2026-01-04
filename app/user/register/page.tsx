@@ -25,7 +25,7 @@ const UserRegister: React.FC = () => {
                 message.success("注册成功")
                 router.replace("/user/login")
             }
-        } catch (e) {
+        } catch (_e) {
             message.error("注册失败")
         }
     }
@@ -80,7 +80,7 @@ const UserRegister: React.FC = () => {
                                             }
                                             return "poor"
                                         }
-                                        const status = getStatus()
+                                        const _status = getStatus()
 
                                         return <div>强度：弱</div>
                                     },
@@ -114,7 +114,7 @@ const UserRegister: React.FC = () => {
                                             }
                                             return "poor"
                                         }
-                                        const status = getStatus()
+                                        const _status = getStatus()
 
                                         return <div>强度：弱</div>
                                     },

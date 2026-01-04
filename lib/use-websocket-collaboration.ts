@@ -1,8 +1,8 @@
 /**
- * React Hook for Yjs Collaboration
+ * React Hook for WebSocket Collaboration (Excalidraw-style)
  *
  * 提供：
- * 1. 自动初始化和清理 Yjs 协作实例
+ * 1. 自动初始化和清理 WebSocket 协作实例
  * 2. 连接状态管理
  * 3. 在线用户数统计
  * 4. 远程更改回调
@@ -10,102 +10,109 @@
 
 import { useEffect, useRef, useState } from "react"
 import {
-    createCollaboration,
-    type YjsCollaboration,
-    type YjsCollaborationOptions,
-} from "./yjs-collab"
+    createWebSocketCollaboration,
+    type WebSocketCollaboration,
+} from "./websocket-collab"
 
-export interface UseYjsCollaborationOptions {
+export interface UseWebSocketCollaborationOptions {
     roomName: string
-    diagramId: string
+    secretKey: string // 密钥,用于加密/解密
     enabled?: boolean
-    isReadOnly?: boolean
     onRemoteChange?: (xml: string) => void
 }
 
-export function useYjsCollaboration({
+export function useWebSocketCollaboration({
     roomName,
-    diagramId,
+    secretKey,
     enabled = true,
-    isReadOnly = false,
     onRemoteChange,
-}: UseYjsCollaborationOptions) {
+}: UseWebSocketCollaborationOptions) {
     const [isConnected, setIsConnected] = useState(false)
     const [userCount, setUserCount] = useState(0)
-    const collabRef = useRef<YjsCollaboration | null>(null)
+    const collabRef = useRef<WebSocketCollaboration | null>(null)
 
-    console.log("[useYjsCollaboration] Render with:", {
+    console.log("[useWebSocketCollaboration] Render with:", {
         roomName,
-        diagramId,
         enabled,
-        isReadOnly,
+        hasSecretKey: !!secretKey,
     })
 
     useEffect(() => {
-        console.log("[useYjsCollaboration] useEffect triggered:", {
+        console.log("[useWebSocketCollaboration] useEffect triggered:", {
             enabled,
             roomName,
+            hasSecretKey: !!secretKey,
         })
 
-        if (!enabled || !roomName) {
+        if (!enabled || !roomName || !secretKey) {
             console.log(
-                "[useYjsCollaboration] Skipping (not enabled or no roomName)",
+                "[useWebSocketCollaboration] Skipping (not enabled or no roomName or no secretKey)",
             )
             return
         }
 
-        console.log("[useYjsCollaboration] Creating collaboration instance...")
+        console.log(
+            "[useWebSocketCollaboration] Creating WebSocket collaboration instance...",
+        )
 
         // 创建协作实例
-        const collab = createCollaboration({
+        const collab = createWebSocketCollaboration({
             roomName,
-            diagramId,
-            isReadOnly,
+            secretKey, // 传入密钥
             onRemoteChange: (xml) => {
+                console.log(
+                    "[useWebSocketCollaboration] onRemoteChange callback, XML length:",
+                    xml?.length,
+                )
                 onRemoteChange?.(xml)
             },
             onConnectionStatusChange: (status) => {
                 console.log(
-                    "[useYjsCollaboration] Connection status changed:",
+                    "[useWebSocketCollaboration] Connection status changed:",
                     status,
                 )
                 setIsConnected(status === "connected")
             },
             onUserCountChange: (count) => {
-                console.log("[useYjsCollaboration] User count changed:", count)
+                console.log(
+                    "[useWebSocketCollaboration] User count changed:",
+                    count,
+                )
                 setUserCount(count)
             },
         })
 
         collabRef.current = collab
-        console.log("[useYjsCollaboration] Collaboration instance created")
+        console.log(
+            "[useWebSocketCollaboration] WebSocket collaboration instance created",
+        )
 
         // 清理函数
         return () => {
             console.log(
-                "[useYjsCollaboration] Cleaning up collaboration instance",
+                "[useWebSocketCollaboration] Cleaning up WebSocket collaboration instance",
             )
             collab.dispose()
             collabRef.current = null
         }
-        // 只依赖 roomName, diagramId, enabled - 移除 isReadOnly 和回调函数
+        // 只依赖 roomName 和 enabled
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [roomName, diagramId, enabled])
+    }, [roomName, enabled])
 
     /**
      * 推送本地更新到协作服务器
      */
     const pushUpdate = (xml: string) => {
         console.log(
-            "[useYjsCollaboration] pushUpdate called, XML length:",
+            "[useWebSocketCollaboration] pushUpdate called, XML length:",
             xml.length,
         )
         console.log(
-            "[useYjsCollaboration] collabRef.current:",
+            "[useWebSocketCollaboration] collabRef.current:",
             collabRef.current,
         )
         console.log(
-            "[useYjsCollaboration] isReadyToPush:",
+            "[useWebSocketCollaboration] isReadyToPush:",
             collabRef.current?.isReadyToPush(),
         )
 
@@ -113,11 +120,11 @@ export function useYjsCollaboration({
 
         if (collabRef.current && readyToPush) {
             console.log(
-                "[useYjsCollaboration] ✅ Pushing update to collab instance",
+                "[useWebSocketCollaboration] ✅ Pushing update to WebSocket server",
             )
-            collabRef.current.pushLocalUpdate(xml)
+            collabRef.current.pushUpdate(xml)
         } else {
-            console.log("[useYjsCollaboration] ❌ Cannot push:", {
+            console.log("[useWebSocketCollaboration] ❌ Cannot push:", {
                 hasCollab: !!collabRef.current,
                 readyToPush,
             })
@@ -125,7 +132,7 @@ export function useYjsCollaboration({
     }
 
     /**
-     * 获取当前文档内容
+     * 获取当前文档内容（WebSocket 方式不维护文档状态）
      */
     const getDocument = (): string => {
         return collabRef.current?.getDocument() || ""

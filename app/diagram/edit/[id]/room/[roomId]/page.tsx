@@ -269,7 +269,7 @@ export default function DrawioHome() {
         (data: any) => {
             handleDiagramExport(data) // 原始处理（更新 chartXML）
             // 检查是否是导出操作，如果是则调用 handleExportCallback
-            if (data && data.data) {
+            if (data?.data) {
                 handleExportCallback(data.data)
             }
         },

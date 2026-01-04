@@ -90,7 +90,7 @@ declare namespace API {
     }
 
     type checkLockParams = {
-        roomId: string | number
+        roomId: number
     }
 
     type Conversion = {
@@ -199,7 +199,13 @@ declare namespace API {
         /** 图表ID */
         diagramId?: number
         /** 创建者ID */
-        owerId?: number
+        ownerId?: number
+        /** 加密后的图表数据 */
+        encryptedData?: string
+        /** 访问地址 */
+        roomUrl?: string
+        /** 加密向量 */
+        iv?: string
         /** 是否公开（0公开，1私有） */
         isPublic?: number
         /** 是否删除（0未删除，1已删除） */
@@ -275,20 +281,12 @@ declare namespace API {
         id: number
     }
 
-    type getRoomByDiagramIdParams = {
-        diagramId: number
-    }
-
     type getUserByIdParams = {
         id: number
     }
 
     type getUserVOByIdParams = {
         id: number
-    }
-
-    type isContainedParams = {
-        roomId: number
     }
 
     type listDiagramChatHistoryParams = {
@@ -421,7 +419,7 @@ declare namespace API {
         /** 房间名称 */
         roomName?: string
         /** 图表ID */
-        diagramId?: string
+        diagramId?: number
     }
 
     type RoomEditRequest = {
@@ -451,7 +449,7 @@ declare namespace API {
         /** 图表ID */
         diagramId?: number
         /** 创建者ID */
-        owerId?: number
+        ownerId?: number
         /** 是否公开（0公开，1私有） */
         isPublic?: number
         /** 创建时间 */
@@ -475,7 +473,32 @@ declare namespace API {
         accessKey?: string
     }
 
-    type RoomVO = Record<string, any>
+    type RoomVO = {
+        /** 房间ID */
+        id?: number
+        /** 房间名称 */
+        roomName?: string
+        /** 图表ID */
+        diagramId?: number
+        /** 创建者ID */
+        ownerId?: number
+        /** 是否公开（0公开，1私有） */
+        isPublic?: number
+        /** 是否删除（0未删除，1已删除） */
+        isDelete?: number
+        /** 创建时间 */
+        createTime?: string
+        /** 访问地址 */
+        roomUrl?: string
+        /** 更新时间 */
+        updateTime?: string
+        /** 是否关闭（0开启，1关闭） */
+        isOpen?: number
+    }
+
+    type saveParams = {
+        roomId: string | number
+    }
 
     type SseEmitter = {
         timeout?: number
@@ -491,7 +514,7 @@ declare namespace API {
     }
 
     type uploadSnapshotParams = {
-        roomId: string | number
+        roomId: number
     }
 
     type User = {
