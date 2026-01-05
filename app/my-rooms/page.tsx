@@ -120,10 +120,12 @@ export default function MyRoomsPage() {
     }
 
     // 跳转到协作编辑页面
-    const handleJoinRoom = (roomId: string | undefined) => {
-        if (roomId) {
-            router.push(`/diagram/edit/${roomId}/room/${roomId}`)
-        }
+    const handleJoinRoom = (room: API.RoomVO) => {
+        // 优先使用后端返回的 roomUrl（包含加密密钥），如果没有则拼接本地路由
+        const targetUrl =
+            room.roomUrl || `/diagram/edit/${room.diagramId}/room/${room.id}`
+
+        router.push(targetUrl)
     }
 
     // 删除房间
@@ -307,9 +309,7 @@ export default function MyRoomsPage() {
                                     overflow: "hidden",
                                 }}
                                 bodyStyle={{ padding: "16px" }}
-                                onClick={() =>
-                                    handleJoinRoom(room.id?.toString())
-                                }
+                                onClick={() => handleJoinRoom(room)}
                             >
                                 <div style={{ marginBottom: "12px" }}>
                                     <h3
@@ -416,9 +416,7 @@ export default function MyRoomsPage() {
                                             size="small"
                                             onClick={(e) => {
                                                 e.stopPropagation()
-                                                handleJoinRoom(
-                                                    room.id?.toString(),
-                                                )
+                                                handleJoinRoom(room)
                                             }}
                                         >
                                             进入

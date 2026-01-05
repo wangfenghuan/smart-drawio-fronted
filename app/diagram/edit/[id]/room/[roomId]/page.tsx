@@ -7,6 +7,7 @@ import { useSelector } from "react-redux"
 import type { ImperativePanelHandle } from "react-resizable-panels"
 import { toast } from "sonner"
 import { getDiagramVoById } from "@/api/diagramController"
+import { editDiagramRoom } from "@/api/roomController"
 import { CollaborationPanel } from "@/components/collaboration-panel"
 import { DiagramToolbar } from "@/components/diagram-toolbar"
 import { STORAGE_CLOSE_PROTECTION_KEY } from "@/components/settings-dialog"
@@ -57,6 +58,7 @@ export default function DrawioHome() {
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [diagramTitle, setDiagramTitle] = useState(`图表_${diagramId}`)
     const [collaborationStarted, setCollaborationStarted] = useState(false)
+    const [roomUrlUpdated, setRoomUrlUpdated] = useState(false)
 
     const chatPanelRef = useRef<ImperativePanelHandle>(null)
     const containerRef = useRef<HTMLDivElement>(null)
@@ -126,6 +128,43 @@ export default function DrawioHome() {
 
         loadDiagramData()
     }, [diagramId, isDrawioReady])
+
+    // 更新房间访问地址到后端
+    const updateRoomUrl = async () => {
+        if (!roomId || roomUrlUpdated) return
+
+        try {
+            // 获取当前页面的完整 URL
+            const roomUrl = window.location.href
+
+            // 调用后端接口更新房间 URL（直接使用字符串，避免精度丢失）
+            const response = await editDiagramRoom({
+                id: roomId,
+                roomUrl: roomUrl,
+            })
+
+            if (response?.code === 0) {
+                console.log("房间 URL 更新成功:", roomUrl)
+                setRoomUrlUpdated(true)
+            } else {
+                console.warn("更新房间 URL 失败:", response?.message)
+            }
+        } catch (error) {
+            console.error("更新房间 URL 时出错:", error)
+        }
+    }
+
+    // 当协作开启成功后，更新房间 URL
+    useEffect(() => {
+        if (collaborationEnabled && roomId && !roomUrlUpdated) {
+            // 延迟一下，确保协作已完全开启
+            const timer = setTimeout(() => {
+                updateRoomUrl()
+            }, 1000)
+
+            return () => clearTimeout(timer)
+        }
+    }, [collaborationEnabled, roomId, roomUrlUpdated])
 
     // Load preferences from localStorage after mount
     useEffect(() => {

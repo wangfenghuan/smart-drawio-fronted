@@ -419,18 +419,20 @@ declare namespace API {
         /** 房间名称 */
         roomName?: string
         /** 图表ID */
-        diagramId?: number
+        diagramId?: number | string
     }
 
     type RoomEditRequest = {
         /** 房间ID */
-        id?: number
+        id?: number | string
         /** 房间名称 */
         roomName?: string
         /** 是否公开（0公开，1私有） */
         isPublic?: number
         /** 是否关闭（0开启，1关闭） */
         isOpen?: number
+        /** 访问地址 */
+        roomUrl?: string
         /** 访问密码 */
         accessKey?: string
     }
@@ -449,7 +451,7 @@ declare namespace API {
         /** 图表ID */
         diagramId?: number
         /** 创建者ID */
-        ownerId?: number
+        owerId?: number
         /** 是否公开（0公开，1私有） */
         isPublic?: number
         /** 创建时间 */
@@ -475,13 +477,13 @@ declare namespace API {
 
     type RoomVO = {
         /** 房间ID */
-        id?: number
+        id?: number | string
         /** 房间名称 */
         roomName?: string
         /** 图表ID */
-        diagramId?: number
+        diagramId?: number | string
         /** 创建者ID */
-        ownerId?: number
+        ownerId?: number | string
         /** 是否公开（0公开，1私有） */
         isPublic?: number
         /** 是否删除（0未删除，1已删除） */
@@ -497,7 +499,7 @@ declare namespace API {
     }
 
     type saveParams = {
-        roomId: string | number
+        roomId: number | string
     }
 
     type SseEmitter = {
@@ -514,7 +516,7 @@ declare namespace API {
     }
 
     type uploadSnapshotParams = {
-        roomId: number
+        roomId: number | string
     }
 
     type User = {
