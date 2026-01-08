@@ -9,6 +9,7 @@ import {
     FolderOutlined,
     PlusOutlined,
     SearchOutlined,
+    UserOutlined,
 } from "@ant-design/icons"
 import {
     App,
@@ -585,6 +586,25 @@ export default function MySpacesPage() {
                                                   ).toLocaleString()
                                                 : "未知"}
                                         </div>
+                                        {space.userVO && (
+                                            <div
+                                                style={{
+                                                    fontSize: "12px",
+                                                    color: "#666",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "6px",
+                                                }}
+                                            >
+                                                <UserOutlined />
+                                                <span>
+                                                    创建者:{" "}
+                                                    {space.userVO.userName ||
+                                                        space.userId ||
+                                                        "未知"}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 </Card>
                             )

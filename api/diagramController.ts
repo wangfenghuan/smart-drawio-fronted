@@ -1,6 +1,6 @@
-// @ts-expect-error
+// @ts-ignore
 /* eslint-disable */
-import request from "@/lib/request"
+import request from "@/lib/request";
 
 /** 创建图表 创建一个新的图表记录。
 
@@ -27,31 +27,31 @@ import request from "@/lib/request"
 5. 更新空间totalCount
  POST /diagram/add */
 export async function addDiagram(
-    body: API.DiagramAddRequest,
-    options?: { [key: string]: any },
+  body: API.DiagramAddRequest,
+  options?: { [key: string]: any }
 ) {
-    return request<API.BaseResponseLong>("/diagram/add", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        data: body,
-        ...(options || {}),
-    })
+  return request<API.BaseResponseLong>("/diagram/add", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: body,
+    ...(options || {}),
+  });
 }
 
 /** 检查上传权限并抢锁 用于协作场景，多个客户端同时编辑时，抢到锁的客户端负责上传图表操作快照到服务器。抢锁成功后有5分钟的冷却期，冷却期内其他客户端无法抢锁。 GET /diagram/check-lock/${param0} */
 export async function checkLock(
-    // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-    params: API.checkLockParams,
-    options?: { [key: string]: any },
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.checkLockParams,
+  options?: { [key: string]: any }
 ) {
-    const { roomId: param0, ...queryParams } = params
-    return request<boolean>(`/diagram/check-lock/${param0}`, {
-        method: "GET",
-        params: { ...queryParams },
-        ...(options || {}),
-    })
+  const { roomId: param0, ...queryParams } = params;
+  return request<boolean>(`/diagram/check-lock/${param0}`, {
+    method: "GET",
+    params: { ...queryParams },
+    ...(options || {}),
+  });
 }
 
 /** 删除图表 删除指定的图表，并自动释放空间额度。
@@ -75,32 +75,32 @@ export async function checkLock(
 - 对象存储中的文件不会自动删除（可通过定时任务清理）
  POST /diagram/delete */
 export async function deleteDiagram(
-    body: API.DeleteRequest,
-    options?: { [key: string]: any },
+  body: API.DeleteRequest,
+  options?: { [key: string]: any }
 ) {
-    return request<API.BaseResponseBoolean>("/diagram/delete", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        data: body,
-        ...(options || {}),
-    })
+  return request<API.BaseResponseBoolean>("/diagram/delete", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: body,
+    ...(options || {}),
+  });
 }
 
 /** 编辑图表信息（给用户使用） POST /diagram/edit */
 export async function editDiagram(
-    body: API.DiagramEditRequest,
-    options?: { [key: string]: any },
+  body: API.DiagramEditRequest,
+  options?: { [key: string]: any }
 ) {
-    return request<API.BaseResponseBoolean>("/diagram/edit", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        data: body,
-        ...(options || {}),
-    })
+  return request<API.BaseResponseBoolean>("/diagram/edit", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: body,
+    ...(options || {}),
+  });
 }
 
 /** 获取图表详情 根据ID获取图表的详细信息。
@@ -117,17 +117,37 @@ export async function editDiagram(
 - 所属空间信息（spaceId）
  GET /diagram/get/vo */
 export async function getDiagramVoById(
-    // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-    params: API.getDiagramVOByIdParams,
-    options?: { [key: string]: any },
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.getDiagramVOByIdParams,
+  options?: { [key: string]: any }
 ) {
-    return request<API.BaseResponseDiagramVO>("/diagram/get/vo", {
-        method: "GET",
-        params: {
-            ...params,
-        },
-        ...(options || {}),
-    })
+  return request<API.BaseResponseDiagramVO>("/diagram/get/vo", {
+    method: "GET",
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** 获取公共空间图表列表 获取所有开放空间的图表（图表广场）
+**功能说明：**
+- 查询所有 spaceId 为 null 的图表（公共图库）
+- 所有登录用户都可以查看
+- 支持分页查询和搜索
+POST /diagram/getDiagrams */
+export async function getByPage(
+  body: API.DiagramQueryRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponsePageDiagramVO>("/diagram/getDiagrams", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: body,
+    ...(options || {}),
+  });
 }
 
 /** 分页查询图表（管理员专用） 管理员专用的图表列表查询接口，可以查询所有图表。
@@ -140,17 +160,17 @@ export async function getDiagramVoById(
 - 支持分页查询
  POST /diagram/list/page */
 export async function listDiagramByPage(
-    body: API.DiagramQueryRequest,
-    options?: { [key: string]: any },
+  body: API.DiagramQueryRequest,
+  options?: { [key: string]: any }
 ) {
-    return request<API.BaseResponsePageDiagram>("/diagram/list/page", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        data: body,
-        ...(options || {}),
-    })
+  return request<API.BaseResponsePageDiagram>("/diagram/list/page", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: body,
+    ...(options || {}),
+  });
 }
 
 /** 分页查询图表列表 查询图表列表，支持公共图库和私有空间两种模式。
@@ -172,17 +192,17 @@ export async function listDiagramByPage(
 - 支持按名称、ID等条件筛选
  POST /diagram/list/page/vo */
 export async function listDiagramVoByPage(
-    body: API.DiagramQueryRequest,
-    options?: { [key: string]: any },
+  body: API.DiagramQueryRequest,
+  options?: { [key: string]: any }
 ) {
-    return request<API.BaseResponsePageDiagramVO>("/diagram/list/page/vo", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        data: body,
-        ...(options || {}),
-    })
+  return request<API.BaseResponsePageDiagramVO>("/diagram/list/page/vo", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: body,
+    ...(options || {}),
+  });
 }
 
 /** 查询我的图表 查询当前登录用户创建的所有图表，包括公共图库和私有空间的图表。
@@ -200,17 +220,17 @@ export async function listDiagramVoByPage(
 - 支持按名称等条件筛选
  POST /diagram/my/list/page/vo */
 export async function listMyDiagramVoByPage(
-    body: API.DiagramQueryRequest,
-    options?: { [key: string]: any },
+  body: API.DiagramQueryRequest,
+  options?: { [key: string]: any }
 ) {
-    return request<API.BaseResponsePageDiagramVO>("/diagram/my/list/page/vo", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        data: body,
-        ...(options || {}),
-    })
+  return request<API.BaseResponsePageDiagramVO>("/diagram/my/list/page/vo", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: body,
+    ...(options || {}),
+  });
 }
 
 /** 下载图表文件 根据图表ID和文件类型，从对象存储流式下载图表文件。
@@ -230,17 +250,17 @@ export async function listMyDiagramVoByPage(
 - 自动设置正确的Content-Type和Content-Disposition响应头
  GET /diagram/stream-download */
 export async function downloadRemoteFile(
-    // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-    params: API.downloadRemoteFileParams,
-    options?: { [key: string]: any },
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.downloadRemoteFileParams,
+  options?: { [key: string]: any }
 ) {
-    return request<any>("/diagram/stream-download", {
-        method: "GET",
-        params: {
-            ...params,
-        },
-        ...(options || {}),
-    })
+  return request<any>("/diagram/stream-download", {
+    method: "GET",
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
 }
 
 /** 更新图表（管理员专用） 管理员专用的图表更新接口，可以更新任意图表信息。
@@ -253,17 +273,17 @@ export async function downloadRemoteFile(
 - 如果需要修改文件大小相关的信息，请谨慎操作
  POST /diagram/update */
 export async function updateDiagram(
-    body: API.DiagramUpdateRequest,
-    options?: { [key: string]: any },
+  body: API.DiagramUpdateRequest,
+  options?: { [key: string]: any }
 ) {
-    return request<API.BaseResponseBoolean>("/diagram/update", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        data: body,
-        ...(options || {}),
-    })
+  return request<API.BaseResponseBoolean>("/diagram/update", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: body,
+    ...(options || {}),
+  });
 }
 
 /** 上传图表文件 上传图表文件（SVG或PNG格式）到对象存储，并更新图表记录和空间额度。
@@ -296,39 +316,36 @@ export async function updateDiagram(
 - 公共图库：所有登录用户可上传
  POST /diagram/upload */
 export async function uploadDiagram(
-    body: {
-        diagramUploadRequest: API.DiagramUploadRequest
-    },
-    options?: { [key: string]: any },
+  body: {
+    diagramUploadRequest: API.DiagramUploadRequest;
+  },
+  options?: { [key: string]: any }
 ) {
-    return request<API.BaseResponseString>("/diagram/upload", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        data: body,
-        ...(options || {}),
-    })
+  return request<API.BaseResponseString>("/diagram/upload", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: body,
+    ...(options || {}),
+  });
 }
 
 /** 上传图表快照 保存协作房间的图表状态快照。上传成功后会异步清理旧的操作记录，只保留最近的状态，减少存储空间占用。 POST /diagram/uploadSnapshot/${param0} */
 export async function uploadSnapshot(
-    // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-    params: API.uploadSnapshotParams,
-    body: string,
-    options?: { [key: string]: any },
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.uploadSnapshotParams,
+  body: string,
+  options?: { [key: string]: any }
 ) {
-    const { roomId: param0, ...queryParams } = params
-    return request<API.BaseResponseBoolean>(
-        `/diagram/uploadSnapshot/${param0}`,
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            params: { ...queryParams },
-            data: body,
-            ...(options || {}),
-        },
-    )
+  const { roomId: param0, ...queryParams } = params;
+  return request<API.BaseResponseBoolean>(`/diagram/uploadSnapshot/${param0}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    params: { ...queryParams },
+    data: body,
+    ...(options || {}),
+  });
 }

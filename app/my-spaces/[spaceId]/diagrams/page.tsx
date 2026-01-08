@@ -5,9 +5,11 @@ import {
     DeleteOutlined,
     EditOutlined,
     FileTextOutlined,
+    FolderOutlined,
     LoadingOutlined,
     PlusOutlined,
     SearchOutlined,
+    UserOutlined,
 } from "@ant-design/icons"
 import {
     App,
@@ -370,9 +372,32 @@ export default function SpaceDiagramsPage() {
                                     style={{
                                         fontSize: "12px",
                                         color: "#999",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "8px",
                                     }}
                                 >
-                                    共 {pagination.total} 个图表
+                                    <span>
+                                        共 {pagination.total} 个图表
+                                    </span>
+                                    {spaceInfo?.userVO && (
+                                        <span
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "4px",
+                                            }}
+                                        >
+                                            <span style={{ margin: "0 4px" }}>
+                                                |
+                                            </span>
+                                            <UserOutlined />
+                                            创建者:{" "}
+                                            {spaceInfo.userVO.userName ||
+                                                spaceInfo.userId ||
+                                                "未知"}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -523,6 +548,53 @@ export default function SpaceDiagramsPage() {
                                                       diagram.createTime,
                                                   ).toLocaleString()
                                                 : "未知时间"}
+                                        </span>
+                                    </div>
+                                    {diagram.userVO && (
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "6px",
+                                                fontSize: "12px",
+                                                color: "#666",
+                                            }}
+                                        >
+                                            <UserOutlined />
+                                            <span
+                                                style={{
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                    flex: 1,
+                                                }}
+                                            >
+                                                创建者:{" "}
+                                                {diagram.userVO.userName ||
+                                                    diagram.userId ||
+                                                    "未知"}
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "6px",
+                                            fontSize: "12px",
+                                            color: "#52c41a",
+                                        }}
+                                    >
+                                        <FolderOutlined />
+                                        <span
+                                            style={{
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                                flex: 1,
+                                            }}
+                                        >
+                                            私有空间
                                         </span>
                                     </div>
                                 </div>

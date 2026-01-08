@@ -4,6 +4,7 @@ import {
     ClockCircleOutlined,
     DeleteOutlined,
     EditOutlined,
+    FolderOutlined,
     LoadingOutlined,
     PlusOutlined,
     SearchOutlined,
@@ -20,7 +21,9 @@ import {
     Modal,
     Pagination,
     Popconfirm,
+    Select,
     Spin,
+    Tag,
     Tooltip,
 } from "antd"
 import { useRouter } from "next/navigation"
@@ -31,6 +34,7 @@ import {
     getDiagramRoomVoById,
     listMyDiagramRoomVoByPage,
 } from "@/api/roomController"
+import { listMySpaceVoByPage } from "@/api/spaceController"
 
 const { Search } = Input
 const { TextArea } = Input
@@ -57,6 +61,35 @@ export default function MyRoomsPage() {
     // 添加防重复请求的标记
     const isLoadingRef = useRef(false)
 
+    // 空间相关状态
+    const [spaces, setSpaces] = useState<API.SpaceVO[]>([])
+    const [filteredSpaces, setFilteredSpaces] = useState<API.SpaceVO[]>([])
+    const [selectedSpaceId, setSelectedSpaceId] = useState<number | undefined>(
+        undefined,
+    )
+
+    // 加载空间列表
+    const loadSpaces = async () => {
+        try {
+            const response = await listMySpaceVoByPage({
+                current: 1,
+                pageSize: 100, // 获取所有空间
+                sortField: "createTime",
+                sortOrder: "desc",
+            })
+
+            if (response?.code === 0 && response?.data) {
+                const allSpaces = response.data.records || []
+                setSpaces(allSpaces)
+
+                // 添加"全部空间"选项
+                setFilteredSpaces(allSpaces)
+            }
+        } catch (error) {
+            console.error("加载空间列表失败:", error)
+        }
+    }
+
     // 加载房间列表
     const loadRooms = async (
         current = pagination.current,
@@ -74,6 +107,9 @@ export default function MyRoomsPage() {
                 current: current,
                 pageSize: pageSize,
                 ...(searchText && { searchText: searchText }),
+                ...(selectedSpaceId !== undefined && {
+                    spaceId: selectedSpaceId,
+                }),
                 sortField: "createTime",
                 sortOrder: "desc",
             })
@@ -117,12 +153,20 @@ export default function MyRoomsPage() {
 
     // 初始加载
     useEffect(() => {
+        loadSpaces()
         loadRooms()
     }, [])
 
     // 搜索触发
     const handleSearch = (value: string) => {
         setSearchText(value)
+        setPagination((prev) => ({ ...prev, current: 1 }))
+        loadRooms(1, pagination.pageSize)
+    }
+
+    // 空间筛选变化
+    const handleSpaceFilterChange = (spaceId: number | undefined) => {
+        setSelectedSpaceId(spaceId)
         setPagination((prev) => ({ ...prev, current: 1 }))
         loadRooms(1, pagination.pageSize)
     }
@@ -147,10 +191,7 @@ export default function MyRoomsPage() {
         if (!id) return
 
         try {
-            // 后端 DeleteRequest 接受单个 id (number)
-            const response = await deleteDiagramRoom({
-                id: parseInt(id, 10) as any,
-            })
+            const response = await deleteDiagramRoom({ id: id as any })
             if (response?.code === 0) {
                 message.success("删除成功")
                 loadRooms()
@@ -263,8 +304,15 @@ export default function MyRoomsPage() {
                     </div>
                 }
             >
-                {/* 搜索栏 */}
-                <div style={{ marginBottom: "24px" }}>
+                {/* 搜索栏和空间筛选 */}
+                <div
+                    style={{
+                        marginBottom: "24px",
+                        display: "flex",
+                        gap: "16px",
+                        alignItems: "center",
+                    }}
+                >
                     <Search
                         placeholder="搜索房间名称..."
                         allowClear
@@ -275,6 +323,29 @@ export default function MyRoomsPage() {
                         onSearch={handleSearch}
                         style={{ maxWidth: "400px" }}
                     />
+                    <Select
+                        placeholder="选择空间筛选"
+                        allowClear
+                        size="large"
+                        style={{ width: "200px" }}
+                        onChange={handleSpaceFilterChange}
+                        value={selectedSpaceId}
+                    >
+                        {spaces.map((space) => (
+                            <Select.Option key={space.id} value={space.id}>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "8px",
+                                    }}
+                                >
+                                    <FolderOutlined />
+                                    {space.spaceName || "未命名空间"}
+                                </div>
+                            </Select.Option>
+                        ))}
+                    </Select>
                 </div>
 
                 {/* 房间列表 Grid */}
@@ -417,9 +488,58 @@ export default function MyRoomsPage() {
                                                 flex: 1,
                                             }}
                                         >
-                                            创建者ID: {room.ownerId || "未知"}
+                                            创建者:{" "}
+                                            {room.userVO?.userName ||
+                                                room.ownerId ||
+                                                "未知"}
                                         </span>
                                     </div>
+                                    {room.spaceId && (
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "6px",
+                                                fontSize: "12px",
+                                                color: "#666",
+                                            }}
+                                        >
+                                            <FolderOutlined />
+                                            <span
+                                                style={{
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                    flex: 1,
+                                                }}
+                                            >
+                                                私有空间 - ID: {room.spaceId}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {!room.spaceId && (
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "6px",
+                                                fontSize: "12px",
+                                                color: "#52c41a",
+                                            }}
+                                        >
+                                            <TeamOutlined />
+                                            <span
+                                                style={{
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                    flex: 1,
+                                                }}
+                                            >
+                                                开放空间
+                                            </span>
+                                        </div>
+                                    )}
                                     <div
                                         style={{
                                             display: "flex",

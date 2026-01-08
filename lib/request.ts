@@ -1,6 +1,6 @@
 import axios from "axios"
 
-// 创建 Axios 示例
+// 创建 Axios 实例
 const myAxios = axios.create({
     baseURL: "http://localhost:8081/api",
     timeout: 10000,
@@ -25,6 +25,7 @@ myAxios.interceptors.response.use(
     (response) => {
         // 处理响应数据
         const { data } = response
+
         // 未登录
         if (data.code === 40100) {
             // 不是获取用户信息接口，或者不是登录页面，则跳转到登录页面
@@ -35,6 +36,7 @@ myAxios.interceptors.response.use(
                 window.location.href = `/user/login?redirect=${window.location.href}`
             }
         }
+
         return data
     },
     // 非 2xx 响应触发

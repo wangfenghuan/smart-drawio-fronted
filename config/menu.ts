@@ -6,7 +6,7 @@ const menus: MenuDataItem[] = [
         name: "主页",
     },
     {
-        path: "/diagrams",
+        path: "/diagram-marketplace",
         name: "图表广场",
     },
     {

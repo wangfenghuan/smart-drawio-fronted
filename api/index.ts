@@ -1,21 +1,20 @@
-// @ts-expect-error
+// @ts-ignore
 /* eslint-disable */
 // API 更新时间：
 // API 唯一标识：
-
-import * as aiClientController from "./aiClientController"
-import * as conversionController from "./conversionController"
-import * as diagramController from "./diagramController"
-import * as fileController from "./fileController"
-import * as roomController from "./roomController"
-import * as spaceController from "./spaceController"
-import * as userController from "./userController"
+import * as userController from "./userController";
+import * as spaceController from "./spaceController";
+import * as roomController from "./roomController";
+import * as fileController from "./fileController";
+import * as diagramController from "./diagramController";
+import * as aiClientController from "./aiClientController";
+import * as conversionController from "./conversionController";
 export default {
-    userController,
-    spaceController,
-    roomController,
-    fileController,
-    diagramController,
-    aiClientController,
-    conversionController,
-}
+  userController,
+  spaceController,
+  roomController,
+  fileController,
+  diagramController,
+  aiClientController,
+  conversionController,
+};
