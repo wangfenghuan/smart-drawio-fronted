@@ -206,19 +206,29 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
     }, [collaborationEnabled, flushPersistence])
 
     const onDrawioLoad = () => {
-        console.log("[DiagramContext] onDrawioLoad 被调用", {
-            hasCalledBefore: hasCalledOnLoadRef.current,
-            isReady: isDrawioReady,
-        })
+        console.log(
+            "[DiagramContext] ========== onDrawioLoad 被调用 ==========",
+            {
+                hasCalledBefore: hasCalledOnLoadRef.current,
+                isReady: isDrawioReady,
+            },
+        )
 
-        // Only set ready state once to prevent infinite loops
-        if (hasCalledOnLoadRef.current) {
-            console.warn("[DiagramContext] onDrawioLoad 已经被调用过，跳过")
+        // 智能逻辑：
+        // 1. 如果 isDrawioReady 已经是 true，说明组件已经加载过了，直接返回
+        // 2. 如果 isDrawioReady 是 false，设置为 true（无论 ref 是什么）
+        // 这样可以避免跨页面时的状态污染问题
+        if (isDrawioReady) {
+            console.log(
+                "[DiagramContext] ⚠️ isDrawioReady 已经是 true，跳过设置",
+            )
             return
         }
+
+        console.log("[DiagramContext] ✅ 正在设置 isDrawioReady = true")
         hasCalledOnLoadRef.current = true
-        console.log("[DiagramContext] 设置 isDrawioReady = true")
         setIsDrawioReady(true)
+        console.log("[DiagramContext] ✅ isDrawioReady 设置完成")
     }
 
     const resetDrawioReady = () => {

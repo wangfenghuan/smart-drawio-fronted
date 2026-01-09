@@ -63,11 +63,15 @@ export default function DrawioHome() {
     const chatPanelRef = useRef<ImperativePanelHandle>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
-    // 组件挂载时，重置 DrawIo ready 状态，确保 onLoad 回调能正常执行
+    // 当 diagramId 改变时，重置 DrawIo 状态
+    // 这确保了切换图表时能重新触发 onLoad
     useEffect(() => {
-        console.log("[协同编辑页面] 组件挂载，重置 DrawIo ready 状态")
+        console.log(
+            "[协同编辑页面] diagramId 变化，重置 DrawIo ready 状态:",
+            diagramId,
+        )
         resetDrawioReady()
-    }, [])
+    }, [diagramId])
 
     // 组件卸载时，关闭协作连接
     useEffect(() => {
@@ -106,57 +110,30 @@ export default function DrawioHome() {
                     }
 
                     console.log(
-                        "[2/3] 数据获取成功，等待 DrawIo ref 和实例准备就绪...",
+                        "[2/3] 数据获取成功，检查 DrawIo ref 是否可用...",
                     )
                     console.log("当前状态:", {
                         isDrawioReady,
                         hasRef: !!drawioRef.current,
                     })
 
-                    // 等待 DrawIo ref 真正可用（不仅要 isDrawioReady=true，还要 drawioRef.current 存在）
-                    const waitForDrawioReady = () => {
-                        return new Promise<void>((resolve) => {
-                            if (isDrawioReady && drawioRef.current) {
-                                console.log("✅ DrawIo 已经完全就绪 (ref 存在)")
-                                resolve()
-                            } else {
-                                console.log("⏳ DrawIo 未就绪，开始轮询等待...")
-                                let checkCount = 0
-                                const maxChecks = 100 // 最多等待10秒 (100 * 100ms)
+                    // 简化逻辑：只要 ref 存在就直接加载，不等待 isDrawioReady
+                    // 因为 ref 存在说明 DrawIo 组件已经渲染完成
+                    if (!drawioRef.current) {
+                        console.warn(
+                            "⚠️ DrawIo ref 不存在，等待 500ms 后重试...",
+                        )
+                        // 如果 ref 不存在，等待一小段时间
+                        await new Promise((resolve) => setTimeout(resolve, 500))
 
-                                const checkInterval = setInterval(() => {
-                                    checkCount++
-
-                                    console.log(
-                                        `[${checkCount}/${maxChecks}] 检查状态:`,
-                                        {
-                                            isDrawioReady,
-                                            hasRef: !!drawioRef.current,
-                                        },
-                                    )
-
-                                    if (isDrawioReady && drawioRef.current) {
-                                        console.log(
-                                            `✅ DrawIo 完全就绪! (轮询 ${checkCount} 次)`,
-                                        )
-                                        clearInterval(checkInterval)
-                                        resolve()
-                                    } else if (checkCount >= maxChecks) {
-                                        console.error("❌ DrawIo 等待超时!")
-                                        console.error("最终状态:", {
-                                            isDrawioReady,
-                                            hasRef: !!drawioRef.current,
-                                            refValue: drawioRef.current,
-                                        })
-                                        clearInterval(checkInterval)
-                                        resolve() // 超时也继续，让 loadDiagram 自己处理
-                                    }
-                                }, 100)
-                            }
-                        })
+                        if (!drawioRef.current) {
+                            console.error("❌ DrawIo ref 仍然不存在，跳过加载")
+                            toast.error("DrawIo 未就绪，请刷新页面重试")
+                            return
+                        }
                     }
 
-                    await waitForDrawioReady()
+                    console.log("✅ DrawIo ref 可用，准备加载图表")
 
                     console.log("[3/3] 正在渲染图表到画布...")
                     console.log(
@@ -461,7 +438,7 @@ export default function DrawioHome() {
                         <div className="w-full h-full relative bg-white rounded-l-2xl overflow-hidden">
                             {isLoaded ? (
                                 <DrawIoEmbed
-                                    key={`${drawioUi}-${darkMode}-${diagramId}`}
+                                    key={`${drawioUi}-${darkMode}`}
                                     ref={drawioRef}
                                     onExport={handleExport}
                                     onLoad={onDrawioLoad}
