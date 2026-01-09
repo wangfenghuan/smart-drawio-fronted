@@ -69,6 +69,16 @@ export default function DrawioHome() {
         resetDrawioReady()
     }, [])
 
+    // 组件卸载时，关闭协作连接
+    useEffect(() => {
+        return () => {
+            console.log("[协同编辑页面] 组件卸载，关闭协作连接")
+            if (collaborationEnabled) {
+                toggleCollaboration(false)
+            }
+        }
+    }, [collaborationEnabled, toggleCollaboration])
+
     // 当 diagramId 改变时，从后端加载对应的图表数据
     useEffect(() => {
         const loadDiagramData = async () => {
