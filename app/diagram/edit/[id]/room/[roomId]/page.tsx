@@ -59,6 +59,7 @@ export default function DrawioHome() {
     const [diagramTitle, setDiagramTitle] = useState(`图表_${diagramId}`)
     const [collaborationStarted, setCollaborationStarted] = useState(false)
     const [roomUrlUpdated, setRoomUrlUpdated] = useState(false)
+    const [currentSpaceId, setCurrentSpaceId] = useState<number | undefined>(undefined) // 当前图表所属的空间ID
 
     const chatPanelRef = useRef<ImperativePanelHandle>(null)
     const containerRef = useRef<HTMLDivElement>(null)
@@ -94,6 +95,12 @@ export default function DrawioHome() {
 
                 if (response?.code === 0 && response?.data) {
                     const diagramData = response.data
+
+                    // 保存 spaceId 到状态中
+                    if (diagramData.spaceId !== undefined) {
+                        console.log("[协同编辑页面] 当前图表所属空间ID:", diagramData.spaceId)
+                        setCurrentSpaceId(diagramData.spaceId)
+                    }
 
                     // 更新图表标题
                     if (diagramData.name) {
@@ -392,7 +399,7 @@ export default function DrawioHome() {
                 <div className="absolute top-5 right-5 z-20 flex items-center justify-between gap-8">
                     {/* 协作面板 - 独立放在左侧 */}
                     <div className="flex-shrink-0">
-                        <CollaborationPanel />
+                        <CollaborationPanel spaceId={currentSpaceId} />
                     </div>
 
                     {/* 右侧按钮组 */}

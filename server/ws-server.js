@@ -1,10 +1,31 @@
 /**
- * 简单的 WebSocket 协作服务器
- * 直接广播 XML 数据，不使用 Yjs
+ * WebSocket 协作服务器（带协议头和权限控制）
+ *
+ * 协议格式:
+ * byte[0]     OpCode (0x00/0x01/0x02)
+ * byte[1...]  Payload (加密数据)
+ *
+ * OpCode 定义:
+ * - 0x00: 全量同步 (FULL_SYNC) - 需要 edit 权限
+ * - 0x01: 光标/感知 (POINTER) - view + edit 都可以
+ * - 0x02: 绘图更新 (ELEMENTS_UPDATE) - 需要 edit 权限
  */
 
 const WebSocket = require("ws")
 const http = require("http")
+
+// OpCode 枚举
+const OpCode = {
+    FULL_SYNC: 0x00,
+    POINTER: 0x01,
+    ELEMENTS_UPDATE: 0x02,
+}
+
+// 用户角色
+const UserRole = {
+    VIEW: "view",
+    EDIT: "edit",
+}
 
 // 创建 HTTP 服务器（用于健康检查）
 const server = http.createServer((req, res) => {
@@ -24,6 +45,20 @@ const wss = new WebSocket.Server({ noServer: true })
 
 // 存储房间和用户的映射
 const rooms = new Map() // roomName -> Set<WebSocket>
+
+// OpCode 名称映射（用于日志）
+function getOpCodeName(opcode) {
+    switch (opcode) {
+        case OpCode.FULL_SYNC:
+            return "FULL_SYNC"
+        case OpCode.POINTER:
+            return "POINTER"
+        case OpCode.ELEMENTS_UPDATE:
+            return "ELEMENTS_UPDATE"
+        default:
+            return `UNKNOWN(0x${opcode.toString(16).padStart(2, "0")})`
+    }
+}
 
 // 处理 WebSocket 升级
 server.on("upgrade", (request, socket, head) => {

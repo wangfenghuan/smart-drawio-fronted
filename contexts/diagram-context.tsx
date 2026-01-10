@@ -16,6 +16,9 @@ import { generateSecretKey, getSecretKeyFromHash } from "../lib/cryptoUtils"
 import { usePersistence } from "../lib/use-persistence"
 import { useWebSocketCollaboration } from "../lib/use-websocket-collaboration"
 import { extractDiagramXML, validateAndFixXml } from "../lib/utils"
+import { UserRole } from "../lib/collab-protocol"
+import { useSelector } from "react-redux"
+import type { RootState } from "@/stores/index"
 
 interface DiagramContextType {
     chartXML: string
@@ -65,11 +68,17 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
     // Track if we're expecting an export for history (user-initiated)
     const expectHistoryExportRef = useRef<boolean>(false)
 
+    // 获取当前用户信息
+    const loginUser = useSelector((state: RootState) => state.loginUser)
+    const currentUserId = loginUser?.id?.toString()
+    const currentUserName = loginUser?.username || loginUser?.nickname || "Anonymous"
+
     // WebSocket 协作状态
     const [collaborationEnabled, setCollaborationEnabled] = useState(false)
     const [collaborationRoomName, setCollaborationRoomName] =
         useState<string>("")
     const [secretKey, setSecretKey] = useState<string>("")
+    const [isReadOnly, setIsReadOnly] = useState(false) // 是否只读模式
     const isUpdatingFromRemoteRef = useRef(false) // 防止循环更新
 
     // 使用 ref 存储最新的协作状态，避免闭包陷阱
@@ -100,15 +109,20 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
         }
     }, [collaborationEnabled])
 
-    // 初始化 WebSocket 协作 Hook（Excalidraw 风格）
+    // 初始化 WebSocket 协作 Hook（带协议头版本）
     const {
         isConnected: collaborationConnected,
         userCount: collaborationUserCount,
         pushUpdate,
+        sendPointer,
+        requestFullSync,
         getDocument,
     } = useWebSocketCollaboration({
         roomName: collaborationRoomName,
         secretKey: secretKey, // 传入密钥用于加密/解密
+        userRole: isReadOnly ? UserRole.VIEW : UserRole.EDIT, // 根据只读状态设置角色
+        userId: currentUserId || "anonymous", // 用户ID
+        userName: currentUserName || "Anonymous", // 用户名
         enabled: collaborationEnabled && !!collaborationRoomName && !!secretKey, // 确保同时满足三个条件
         onRemoteChange: (xml) => {
             // 远程更新：应用到 Draw.io
@@ -539,10 +553,11 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
 
     // 切换协作模式
     const toggleCollaboration = useCallback(
-        (enabled: boolean, roomName?: string, _isReadOnly?: boolean) => {
+        (enabled: boolean, roomName?: string, isReadOnly?: boolean) => {
             console.log("[DiagramContext] toggleCollaboration called:", {
                 enabled,
                 roomName,
+                isReadOnly,
             })
 
             if (enabled && !roomName) {
@@ -550,6 +565,12 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
                     "[DiagramContext] Cannot enable collaboration without roomName",
                 )
                 return
+            }
+
+            // 设置只读模式
+            if (isReadOnly !== undefined) {
+                setIsReadOnly(isReadOnly)
+                console.log("[DiagramContext] Setting isReadOnly to:", isReadOnly)
             }
 
             console.log(
@@ -563,7 +584,6 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
 
             setCollaborationEnabled(enabled)
             setCollaborationRoomName(roomName || "")
-            // isReadOnly 参数已废弃，保留兼容性但不使用
         },
         [],
     )

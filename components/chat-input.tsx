@@ -171,6 +171,9 @@ export function ChatInput({
     const [showClearDialog, setShowClearDialog] = useState(false)
     const [showSaveDialog, setShowSaveDialog] = useState(false)
 
+    // 调试：打印 userId 和 diagramId
+    console.log("[ChatInput] 当前的 userId:", userId, "diagramId:", diagramId)
+
     // Allow retry when there's an error (even if status is still "streaming" or "submitted")
     const isDisabled =
         (status === "streaming" || status === "submitted") &&

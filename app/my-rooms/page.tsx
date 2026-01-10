@@ -72,7 +72,7 @@ export default function MyRoomsPage() {
         try {
             const response = await listMySpaceVoByPage({
                 current: 1,
-                pageSize: 100, // 获取所有空间
+                pageSize: 20, // 后端限制 pageSize 最大为 20
                 sortField: "createTime",
                 sortOrder: "desc",
             })

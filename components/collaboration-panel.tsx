@@ -22,7 +22,7 @@ import { addRoom } from "@/api/roomController"
 import { Button } from "@/components/ui/button"
 import { useDiagram } from "@/contexts/diagram-context"
 
-export function CollaborationPanel() {
+export function CollaborationPanel({ spaceId }: { spaceId?: number }) {
     const { id: diagramId } = useParams()
     const router = useRouter()
     const {
@@ -31,6 +31,8 @@ export function CollaborationPanel() {
         collaborationUserCount,
         toggleCollaboration,
     } = useDiagram()
+
+    console.log("[CollaborationPanel] 组件渲染, 接收到的 spaceId:", spaceId)
 
     const [roomId, setRoomId] = useState<string>("")
     const [isReadOnly, setIsReadOnly] = useState(false)
@@ -43,13 +45,28 @@ export function CollaborationPanel() {
             return
         }
 
+        console.log("[CollaborationPanel] 准备创建协作房间", {
+            diagramId,
+            spaceId,
+            spaceIdType: typeof spaceId,
+        })
+
         setIsStarting(true)
         try {
             // 调用后端 API 获取或创建房间（后端会自动判断是创建还是返回已有房间）
-            const response = await addRoom({
+            const requestData: any = {
                 roomName: `协作房间_${diagramId}`,
                 diagramId: diagramId as string, // 直接使用字符串，避免精度丢失
-            })
+            }
+
+            // 只有当 spaceId 存在时才添加
+            if (spaceId !== undefined) {
+                requestData.spaceId = spaceId
+            }
+
+            console.log("[CollaborationPanel] 发送请求参数:", requestData)
+
+            const response = await addRoom(requestData)
 
             if (response?.code === 0 && response?.data) {
                 const returnedRoomId = String(response.data)

@@ -1,11 +1,13 @@
 /**
- * React Hook for WebSocket Collaboration (Excalidraw-style)
+ * React Hook for WebSocket Collaboration (带协议头版本)
  *
  * 提供：
  * 1. 自动初始化和清理 WebSocket 协作实例
  * 2. 连接状态管理
  * 3. 在线用户数统计
  * 4. 远程更改回调
+ * 5. 光标位置同步
+ * 6. 权限控制（view/edit）
  */
 
 import { useEffect, useRef, useState } from "react"
@@ -13,19 +15,28 @@ import {
     createWebSocketCollaboration,
     type WebSocketCollaboration,
 } from "./websocket-collab"
+import { UserRole, PointerData } from "./collab-protocol"
 
 export interface UseWebSocketCollaborationOptions {
     roomName: string
     secretKey: string // 密钥,用于加密/解密
+    userRole: UserRole // 用户角色
+    userId: string // 用户ID
+    userName?: string // 用户名
     enabled?: boolean
     onRemoteChange?: (xml: string) => void
+    onPointerMove?: (pointer: PointerData) => void
 }
 
 export function useWebSocketCollaboration({
     roomName,
     secretKey,
+    userRole,
+    userId,
+    userName,
     enabled = true,
     onRemoteChange,
+    onPointerMove,
 }: UseWebSocketCollaborationOptions) {
     const [isConnected, setIsConnected] = useState(false)
     const [userCount, setUserCount] = useState(0)
@@ -35,6 +46,8 @@ export function useWebSocketCollaboration({
         roomName,
         enabled,
         hasSecretKey: !!secretKey,
+        userRole,
+        userId,
     })
 
     useEffect(() => {
@@ -42,11 +55,13 @@ export function useWebSocketCollaboration({
             enabled,
             roomName,
             hasSecretKey: !!secretKey,
+            userRole,
+            userId,
         })
 
-        if (!enabled || !roomName || !secretKey) {
+        if (!enabled || !roomName || !secretKey || !userId) {
             console.log(
-                "[useWebSocketCollaboration] Skipping (not enabled or no roomName or no secretKey)",
+                "[useWebSocketCollaboration] Skipping (missing required params)",
             )
             return
         }
@@ -58,13 +73,23 @@ export function useWebSocketCollaboration({
         // 创建协作实例
         const collab = createWebSocketCollaboration({
             roomName,
-            secretKey, // 传入密钥
+            secretKey,
+            userRole,
+            userId,
+            userName,
             onRemoteChange: (xml) => {
                 console.log(
                     "[useWebSocketCollaboration] onRemoteChange callback, XML length:",
                     xml?.length,
                 )
                 onRemoteChange?.(xml)
+            },
+            onPointerMove: (pointer) => {
+                console.log(
+                    "[useWebSocketCollaboration] onPointerMove callback:",
+                    pointer.userName,
+                )
+                onPointerMove?.(pointer)
             },
             onConnectionStatusChange: (status) => {
                 console.log(
@@ -95,9 +120,9 @@ export function useWebSocketCollaboration({
             collab.dispose()
             collabRef.current = null
         }
-        // 只依赖 roomName 和 enabled
+        // 只依赖 roomName、enabled 和 userRole
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [roomName, enabled])
+    }, [roomName, enabled, userRole])
 
     /**
      * 推送本地更新到协作服务器
@@ -138,10 +163,30 @@ export function useWebSocketCollaboration({
         return collabRef.current?.getDocument() || ""
     }
 
+    /**
+     * 发送光标位置
+     */
+    const sendPointer = (x: number, y: number) => {
+        if (collabRef.current && collabRef.current.isConnected()) {
+            collabRef.current.sendPointer(x, y)
+        }
+    }
+
+    /**
+     * 请求全量同步
+     */
+    const requestFullSync = () => {
+        if (collabRef.current && collabRef.current.isConnected()) {
+            collabRef.current.requestFullSync()
+        }
+    }
+
     return {
         isConnected,
         userCount,
         pushUpdate,
+        sendPointer,
+        requestFullSync,
         getDocument,
         collaboration: collabRef.current,
         isReadyToPush: () => collabRef.current?.isReadyToPush() || false,
