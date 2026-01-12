@@ -130,8 +130,11 @@ export function getOpCodeName(opcode: OpCode): string {
             return "POINTER"
         case OpCode.ELEMENTS_UPDATE:
             return "ELEMENTS_UPDATE"
-        default:
-            return `UNKNOWN(0x${opcode.toString(16).padStart(2, "0")})`
+        default: {
+            // TypeScript 类型收窄问题，使用类型断言
+            const unknownOpcode = opcode as number
+            return `UNKNOWN(0x${unknownOpcode.toString(16).padStart(2, "0")})`
+        }
     }
 }
 

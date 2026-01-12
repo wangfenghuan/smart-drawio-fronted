@@ -1,8 +1,8 @@
 /**
- * React Hook for WebSocket Collaboration (带协议头版本)
+ * React Hook for Yjs Collaboration
  *
  * 提供：
- * 1. 自动初始化和清理 WebSocket 协作实例
+ * 1. 自动初始化和清理 Yjs 协作实例
  * 2. 连接状态管理
  * 3. 在线用户数统计
  * 4. 远程更改回调
@@ -11,148 +11,138 @@
  */
 
 import { useEffect, useRef, useState } from "react"
-import type { PointerData, UserRole } from "./collab-protocol"
-import {
-    createWebSocketCollaboration,
-    type WebSocketCollaboration,
-} from "./websocket-collab"
+import type { UserRole } from "./collab-protocol"
+import { createYjsCollaboration, type YjsCollaboration } from "./yjs-collab"
 
-export interface UseWebSocketCollaborationOptions {
+export interface UseYjsCollaborationOptions {
     roomName: string
-    secretKey: string // 密钥,用于加密/解密
+    serverUrl: string // WebSocket 服务器 URL
     userRole: UserRole // 用户角色
     userId: string // 用户ID
     userName?: string // 用户名
     enabled?: boolean
     onRemoteChange?: (xml: string) => void
-    onPointerMove?: (pointer: PointerData) => void
+    onPointerMove?: (pointer: any) => void
 }
 
-export function useWebSocketCollaboration({
+export function useYjsCollaboration({
     roomName,
-    secretKey,
+    serverUrl,
     userRole,
     userId,
     userName,
     enabled = true,
     onRemoteChange,
     onPointerMove,
-}: UseWebSocketCollaborationOptions) {
+}: UseYjsCollaborationOptions) {
     const [isConnected, setIsConnected] = useState(false)
     const [userCount, setUserCount] = useState(0)
-    const collabRef = useRef<WebSocketCollaboration | null>(null)
+    const collabRef = useRef<YjsCollaboration | null>(null)
 
-    console.log("[useWebSocketCollaboration] Render with:", {
+    console.log("[useYjsCollaboration] Render with:", {
         roomName,
+        serverUrl,
         enabled,
-        hasSecretKey: !!secretKey,
         userRole,
         userId,
     })
 
     useEffect(() => {
-        console.log("[useWebSocketCollaboration] useEffect triggered:", {
+        console.log("[useYjsCollaboration] useEffect triggered:", {
             enabled,
             roomName,
-            hasSecretKey: !!secretKey,
+            serverUrl,
             userRole,
             userId,
         })
 
-        if (!enabled || !roomName || !secretKey || !userId) {
+        if (!enabled || !roomName || !serverUrl || !userId) {
             console.log(
-                "[useWebSocketCollaboration] Skipping (missing required params)",
+                "[useYjsCollaboration] Skipping (missing required params)",
             )
             return
         }
 
         console.log(
-            "[useWebSocketCollaboration] Creating WebSocket collaboration instance...",
+            "[useYjsCollaboration] Creating Yjs collaboration instance...",
         )
 
         // 创建协作实例
-        const collab = createWebSocketCollaboration({
+        const collab = createYjsCollaboration({
             roomName,
-            secretKey,
+            serverUrl,
             userRole,
             userId,
             userName,
-            onRemoteChange: (data) => {
+            onRemoteChange: (xml) => {
                 console.log(
-                    "[useWebSocketCollaboration] onRemoteChange callback, data type:",
-                    typeof data,
+                    "[useYjsCollaboration] onRemoteChange callback, XML length:",
+                    xml?.length,
                 )
-                // 只处理字符串类型的数据（XML）
-                if (typeof data === "string") {
-                    onRemoteChange?.(data)
-                }
+                onRemoteChange?.(xml)
             },
             onPointerMove: (pointer) => {
                 console.log(
-                    "[useWebSocketCollaboration] onPointerMove callback:",
+                    "[useYjsCollaboration] onPointerMove callback:",
                     pointer.userName,
                 )
                 onPointerMove?.(pointer)
             },
             onConnectionStatusChange: (status) => {
                 console.log(
-                    "[useWebSocketCollaboration] Connection status changed:",
+                    "[useYjsCollaboration] Connection status changed:",
                     status,
                 )
                 setIsConnected(status === "connected")
             },
             onUserCountChange: (count) => {
-                console.log(
-                    "[useWebSocketCollaboration] User count changed:",
-                    count,
-                )
+                console.log("[useYjsCollaboration] User count changed:", count)
                 setUserCount(count)
             },
         })
 
+        // 注册光标移动监听
+        if (onPointerMove) {
+            collab.onPointerMove(onPointerMove)
+        }
+
         collabRef.current = collab
-        console.log(
-            "[useWebSocketCollaboration] WebSocket collaboration instance created",
-        )
+        console.log("[useYjsCollaboration] Yjs collaboration instance created")
 
         // 清理函数
         return () => {
             console.log(
-                "[useWebSocketCollaboration] Cleaning up WebSocket collaboration instance",
+                "[useYjsCollaboration] Cleaning up Yjs collaboration instance",
             )
             collab.dispose()
             collabRef.current = null
         }
-        // 只依赖 roomName、enabled 和 userRole
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [roomName, enabled, userRole])
+    }, [roomName, serverUrl, enabled, userRole])
 
     /**
      * 推送本地更新到协作服务器
      */
     const pushUpdate = (xml: string) => {
         console.log(
-            "[useWebSocketCollaboration] pushUpdate called, XML length:",
+            "[useYjsCollaboration] pushUpdate called, XML length:",
             xml.length,
         )
         console.log(
-            "[useWebSocketCollaboration] collabRef.current:",
+            "[useYjsCollaboration] collabRef.current:",
             collabRef.current,
         )
         console.log(
-            "[useWebSocketCollaboration] isReadyToPush:",
+            "[useYjsCollaboration] isReadyToPush:",
             collabRef.current?.isReadyToPush(),
         )
 
         const readyToPush = collabRef.current?.isReadyToPush() || false
 
         if (collabRef.current && readyToPush) {
-            console.log(
-                "[useWebSocketCollaboration] ✅ Pushing update to WebSocket server",
-            )
+            console.log("[useYjsCollaboration] ✅ Pushing update to Yjs server")
             collabRef.current.pushUpdate(xml)
         } else {
-            console.log("[useWebSocketCollaboration] ❌ Cannot push:", {
+            console.log("[useYjsCollaboration] ❌ Cannot push:", {
                 hasCollab: !!collabRef.current,
                 readyToPush,
             })
@@ -160,7 +150,7 @@ export function useWebSocketCollaboration({
     }
 
     /**
-     * 获取当前文档内容（WebSocket 方式不维护文档状态）
+     * 获取当前文档内容
      */
     const getDocument = (): string => {
         return collabRef.current?.getDocument() || ""
@@ -175,21 +165,11 @@ export function useWebSocketCollaboration({
         }
     }
 
-    /**
-     * 请求全量同步
-     */
-    const requestFullSync = () => {
-        if (collabRef.current?.isConnected()) {
-            collabRef.current.requestFullSync()
-        }
-    }
-
     return {
         isConnected,
         userCount,
         pushUpdate,
         sendPointer,
-        requestFullSync,
         getDocument,
         collaboration: collabRef.current,
         isReadyToPush: () => collabRef.current?.isReadyToPush() || false,

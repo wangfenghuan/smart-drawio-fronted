@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Yjs Update 调试</title>
+</head>
+<body>
+    <h1>Yjs 二进制更新调试工具</h1>
+    <div id="output"></div>
+
+    <script type="module">
+        import * as Y from 'https://esm.sh/yjs@13.6.10'
+
+        const output = document.getElementById('output')
+
+        function log(msg) {
+            output.innerHTML += `<div>${msg}</div>`
+        }
+
+        // 创建 Yjs 文档
+        const ydoc = new Y.Doc()
+        const ytext = ydoc.getText('test')
+
+        // 监听更新事件
+        ydoc.on('update', (update, origin) => {
+            log(`<h3>收到 Yjs 更新</h3>`)
+            log(`<p><strong>Update 大小:</strong> ${update.length} bytes</p>`)
+            log(`<p><strong>原始字节:</strong></p>`)
+            log(`<pre>${Array.from(update).map(b => b.toString(16).padStart(2, '0')).join(' ')}</pre>`)
+
+            // 解析基本信息
+            let offset = 0
+            const clientId = update.readBigUint64LE(offset); offset += 8
+            const clock = decodeVarUint(update, offset)
+
+            log(`<p><strong>Client ID:</strong> ${clientId}</p>`)
+            log(`<p><strong>Clock:</strong> ${clock.value}</p>`)
+
+            // 尝试读取字符串内容
+            log(`<p><strong>尝试解码为字符串:</strong></p>`)
+            try {
+                const decoder = new TextDecoder('utf-8')
+                const text = decoder.decode(update)
+                log(`<pre>${text.substring(0, 200)}...</pre>`)
+            } catch (e) {
+                log(`<p>无法解码为文本</p>`)
+            }
+        })
+
+        // 插入一些文本
+        log(`<h2>测试操作</h2>`)
+        log(`<p>插入 XML...</p>`)
+        ytext.insert(0, '<mxGraphModel><root><mxCell id="0"/></root></mxGraphModel>')
+        log(`<p>✅ 插入完成</p>`)
+
+        // VarUint 解码函数
+        function decodeVarUint(uint8Array, offset) {
+            let value = 0
+            let shift = 0
+            let i = offset
+
+            while (i < uint8Array.length) {
+                const byte = uint8Array[i]
+                value += (byte & 0x7f) << shift
+                i++
+
+                if (!(byte & 0x80)) {
+                    return { value, offset: i }
+                }
+
+                shift += 7
+            }
+
+            throw new Error('Invalid VarUint')
+        }
+    </script>
+</body>
+</html>

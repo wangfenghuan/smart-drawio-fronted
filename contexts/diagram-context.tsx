@@ -21,7 +21,7 @@ import {
     getSecretKeyFromHash,
 } from "../lib/cryptoUtils"
 import { usePersistence } from "../lib/use-persistence"
-import { useWebSocketCollaboration } from "../lib/use-websocket-collaboration"
+import { useYjsCollaborationWrapper } from "../lib/use-yjs-collaboration-wrapper"
 import { extractDiagramXML, validateAndFixXml } from "../lib/utils"
 
 interface DiagramContextType {
@@ -136,81 +136,82 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
         initKey()
     }, [collaborationRoomName, collaborationEnabled])
 
-    // 初始化 WebSocket 协作 Hook（带协议头版本）
+    // 创建稳定的 onRemoteChange 回调，避免频繁重建协作实例
+    const handleRemoteChange = useCallback((xml: string) => {
+        // 远程更新：应用到 Draw.io
+        console.log("[DiagramContext] 🔔 onRemoteChange called!", {
+            hasXml: !!xml,
+            xmlLength: xml?.length,
+            isUpdatingFromRemote: isUpdatingFromRemoteRef.current,
+        })
+
+        // 打印XML的前200个字符，方便调试
+        if (xml) {
+            console.log(
+                "[DiagramContext] 📄 XML preview (first 200 chars):",
+                xml.substring(0, 200),
+            )
+        }
+
+        if (!isUpdatingFromRemoteRef.current && xml) {
+            isUpdatingFromRemoteRef.current = true
+            console.log("[DiagramContext] 📥 Loading remote XML to Draw.io...")
+
+            // 直接加载到 Draw.io，不触发 WebSocket 推送
+            setChartXML(xml)
+
+            if (drawioRef.current) {
+                try {
+                    drawioRef.current.load({
+                        xml: xml,
+                    })
+                    console.log(
+                        "[DiagramContext] ✅ Remote XML loaded to Draw.io",
+                    )
+
+                    // 延迟重置标志，确保 Draw.io 完成渲染
+                    setTimeout(() => {
+                        isUpdatingFromRemoteRef.current = false
+                        console.log(
+                            "[DiagramContext] 🔓 Remote update flag cleared",
+                        )
+                    }, 500)
+                } catch (error) {
+                    console.error(
+                        "[DiagramContext] ❌ Failed to load XML:",
+                        error,
+                    )
+                    isUpdatingFromRemoteRef.current = false
+                }
+            } else {
+                console.warn(
+                    "[DiagramContext] ⚠️ drawioRef.current is null, cannot load XML",
+                )
+                isUpdatingFromRemoteRef.current = false
+            }
+        } else {
+            console.log(
+                "[DiagramContext] ⏭️ Skipping remote change (updating or no xml)",
+            )
+        }
+    }, []) // 空依赖数组，确保引用稳定
+
+    // 初始化 Yjs + 自定义协议混合协作 Hook
     const {
         isConnected: collaborationConnected,
         userCount: collaborationUserCount,
         pushUpdate,
-        // sendPointer,  // 暂时未使用，保留供将来功能
-        // requestFullSync,  // 暂时未使用，保留供将来功能
+        sendPointer,
+        requestFullSync,
         getDocument,
-    } = useWebSocketCollaboration({
+    } = useYjsCollaborationWrapper({
         roomName: collaborationRoomName,
         secretKey: secretKey, // 传入密钥用于加密/解密
         userRole: isReadOnly ? UserRole.VIEW : UserRole.EDIT, // 根据只读状态设置角色
         userId: currentUserId || "anonymous", // 用户ID
         userName: currentUserName || "Anonymous", // 用户名
         enabled: collaborationEnabled && !!collaborationRoomName && !!secretKey, // 确保同时满足三个条件
-        onRemoteChange: (xml) => {
-            // 远程更新：应用到 Draw.io
-            console.log("[DiagramContext] 🔔 onRemoteChange called!", {
-                hasXml: !!xml,
-                xmlLength: xml?.length,
-                isUpdatingFromRemote: isUpdatingFromRemoteRef.current,
-            })
-
-            // 打印XML的前200个字符，方便调试
-            if (xml) {
-                console.log(
-                    "[DiagramContext] 📄 XML preview (first 200 chars):",
-                    xml.substring(0, 200),
-                )
-            }
-
-            if (!isUpdatingFromRemoteRef.current && xml) {
-                isUpdatingFromRemoteRef.current = true
-                console.log(
-                    "[DiagramContext] 📥 Loading remote XML to Draw.io...",
-                )
-
-                // 直接加载到 Draw.io，不触发 WebSocket 推送
-                setChartXML(xml)
-
-                if (drawioRef.current) {
-                    try {
-                        drawioRef.current.load({
-                            xml: xml,
-                        })
-                        console.log(
-                            "[DiagramContext] ✅ Remote XML loaded to Draw.io",
-                        )
-
-                        // 延迟重置标志，确保 Draw.io 完成渲染
-                        setTimeout(() => {
-                            isUpdatingFromRemoteRef.current = false
-                            console.log(
-                                "[DiagramContext] 🔓 Remote update flag cleared",
-                            )
-                        }, 500)
-                    } catch (error) {
-                        console.error(
-                            "[DiagramContext] ❌ Failed to load XML:",
-                            error,
-                        )
-                        isUpdatingFromRemoteRef.current = false
-                    }
-                } else {
-                    console.warn(
-                        "[DiagramContext] ⚠️ drawioRef.current is null, cannot load XML",
-                    )
-                    isUpdatingFromRemoteRef.current = false
-                }
-            } else {
-                console.log(
-                    "[DiagramContext] ⏭️ Skipping remote change (updating or no xml)",
-                )
-            }
-        },
+        onRemoteChange: handleRemoteChange,
     })
 
     // 更新 ref 当连接状态变化时

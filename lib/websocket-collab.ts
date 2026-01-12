@@ -9,22 +9,13 @@
  * 3. 支持权限控制（view/edit）
  */
 
-import {
-    packElementsMessage,
-    packPointerMessage,
-    packSyncMessage,
-    unpackElementsMessage,
-    unpackMessage,
-    unpackPointerMessage,
-    unpackSyncMessage,
-} from "./collab-packet"
+import { unpackMessage } from "./collab-packet"
 import {
     canSend,
     getOpCodeName,
     type PointerData,
     type UserRole,
 } from "./collab-protocol"
-import { decryptData } from "./cryptoUtils"
 
 export interface WebSocketCollaborationOptions {
     roomName: string
@@ -32,7 +23,7 @@ export interface WebSocketCollaborationOptions {
     userRole: UserRole // 用户角色
     userId: string // 用户ID
     userName?: string // 用户名（可选）
-    onRemoteChange?: (xml: string) => void
+    onRemoteChange?: (xml: string | Uint8Array) => void // 支持 XML 字符串或二进制数据
     onPointerMove?: (pointer: PointerData) => void
     onConnectionStatusChange?: (
         status: "connecting" | "connected" | "disconnected",
@@ -97,10 +88,23 @@ export class WebSocketCollaboration {
                 await this.handleMessage(event.data)
             }
 
-            this.ws.onclose = () => {
-                console.log("[WebSocketCollab] Connection closed")
+            this.ws.onclose = (event) => {
+                console.log("[WebSocketCollab] Connection closed", {
+                    wasClean: event.wasClean,
+                    code: event.code,
+                    reason: event.reason,
+                    isDisposed: this.isDisposed,
+                })
                 this.options.onConnectionStatusChange?.("disconnected")
-                this.scheduleReconnect()
+
+                // 只有在非主动关闭时才重连
+                if (!this.isDisposed) {
+                    this.scheduleReconnect()
+                } else {
+                    console.log(
+                        "[WebSocketCollab] Instance disposed, not reconnecting",
+                    )
+                }
             }
 
             this.ws.onerror = (error) => {
@@ -114,44 +118,34 @@ export class WebSocketCollaboration {
 
     /**
      * 处理接收到的消息
-     * 支持两种格式:
+     * 支持三种格式:
      * 1. 二进制数据 (ArrayBuffer) - 带协议头的加密消息
-     * 2. JSON 文本 - 元数据(如用户数)
+     * 2. Uint8Array - 后端直接发送的二进制数据
+     * 3. JSON 文本 - 元数据(如用户数)
      */
     private async handleMessage(data: any) {
         if (this.isDisposed) return
 
         try {
-            // 如果是二进制数据,解析协议头
+            let buffer: ArrayBuffer
+
+            // 处理不同的数据类型
             if (data instanceof ArrayBuffer) {
+                buffer = data
                 console.log(
-                    "[WebSocketCollab] 📨 Received binary data, size:",
+                    "[WebSocketCollab] 📨 Received ArrayBuffer, size:",
                     data.byteLength,
                 )
-
-                // 检查数据长度是否合法（至少需要 1 字节 OpCode）
-                if (data.byteLength < 1) {
-                    console.warn(
-                        "[WebSocketCollab] ⚠️ Received empty binary data",
-                    )
-                    return
-                }
-
-                // 解包消息（解析协议头）
-                const { opcode, payload } = unpackMessage(data)
-
+            } else if (data instanceof Uint8Array) {
+                // 创建一个新的 ArrayBuffer 来避免 SharedArrayBuffer 问题
+                buffer = new ArrayBuffer(data.byteLength)
+                new Uint8Array(buffer).set(data)
                 console.log(
-                    "[WebSocketCollab] 📦 Unpacked message: OpCode=",
-                    opcode.toString(16),
-                    "Payload size:",
-                    payload.length,
+                    "[WebSocketCollab] 📨 Received Uint8Array, size:",
+                    data.byteLength,
                 )
-
-                // 根据 OpCode 分发到不同的处理器
-                await this.handleProtocolMessage(opcode, payload)
-            }
-            // 如果是 JSON 文本,处理元数据
-            else if (typeof data === "string") {
+            } else if (typeof data === "string") {
+                // JSON 文本,处理元数据
                 const message = JSON.parse(data)
                 console.log(
                     "[WebSocketCollab] 📨 Received JSON message:",
@@ -165,7 +159,33 @@ export class WebSocketCollaboration {
                     )
                     this.options.onUserCountChange?.(message.count)
                 }
+                return
+            } else {
+                console.warn(
+                    "[WebSocketCollab] ⚠️ Unknown data type:",
+                    typeof data,
+                )
+                return
             }
+
+            // 检查数据长度是否合法（至少需要 1 字节 OpCode）
+            if (buffer.byteLength < 1) {
+                console.warn("[WebSocketCollab] ⚠️ Received empty binary data")
+                return
+            }
+
+            // 解包消息（解析协议头）
+            const { opcode, payload } = unpackMessage(buffer)
+
+            console.log(
+                "[WebSocketCollab] 📦 Unpacked message: OpCode=",
+                opcode.toString(16),
+                "Payload size:",
+                payload.length,
+            )
+
+            // 根据 OpCode 分发到不同的处理器
+            await this.handleProtocolMessage(opcode, payload)
         } catch (error) {
             console.error(
                 "[WebSocketCollab] ❌ Failed to handle message:",
@@ -196,51 +216,34 @@ export class WebSocketCollaboration {
                 case 0x00: // FULL_SYNC
                     {
                         console.log("[WebSocketCollab] 📥 Processing FULL_SYNC")
-                        try {
-                            // 服务器直接发送加密的 XML 数据，不需要先解包成 syncData
-                            const xml = await decryptData(
-                                payload,
-                                this.secretKey,
-                            )
-                            console.log(
-                                "[WebSocketCollab] 📄 Full sync XML length:",
-                                xml.length,
-                            )
-                            console.log(
-                                "[WebSocketCollab] 📄 XML preview (first 200 chars):",
-                                xml.substring(0, 200),
-                            )
 
-                            // 调用 onRemoteChange 加载到画布
-                            this.options.onRemoteChange?.(xml)
+                        // 检查 payload 是否为空
+                        if (payload.length === 0) {
                             console.log(
-                                "[WebSocketCollab] ✅ Full sync loaded to canvas",
+                                "[WebSocketCollab] ⚠️ Full sync payload is empty",
                             )
-                        } catch (decryptError) {
-                            console.error(
-                                "[WebSocketCollab] ❌ Full sync decryption failed:",
-                                decryptError,
-                            )
-                            // FULL_SYNC 解密失败时，使用空白画布
-                            console.log(
-                                "[WebSocketCollab] 💡 Using blank canvas instead",
-                            )
-                            const blankXml = `<mxfile><diagram name="Page-1" id="page-1"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel></diagram></mxfile>`
-                            this.options.onRemoteChange?.(blankXml)
+                            return
                         }
+
+                        console.log(
+                            "[WebSocketCollab] 📦 Full sync payload size:",
+                            payload.length,
+                        )
+
+                        // FULL_SYNC 数据是 Yjs 二进制更新
+                        // 传递 Uint8Array 给上层处理
+                        this.options.onRemoteChange?.(payload)
                     }
                     break
 
                 case 0x01: // POINTER
                     {
-                        console.log("[WebSocketCollab] 👆 Processing POINTER")
-                        const pointer = await unpackPointerMessage(
-                            payload,
-                            this.secretKey,
-                        )
-                        console.log(
-                            `[WebSocketCollab] ✅ Pointer: ${pointer.userName} (${pointer.x}, ${pointer.y})`,
-                        )
+                        // POINTER 数据是明文 JSON 字符串（UTF-8 编码）
+                        const jsonStr = new TextDecoder().decode(payload)
+                        const pointer = JSON.parse(jsonStr) as PointerData
+                        // console.log(
+                        //     `[WebSocketCollab] ✅ Pointer: ${pointer.userName} (${pointer.x}, ${pointer.y})`,
+                        // )
                         this.options.onPointerMove?.(pointer)
                     }
                     break
@@ -250,15 +253,9 @@ export class WebSocketCollaboration {
                         console.log(
                             "[WebSocketCollab] 🎨 Processing ELEMENTS_UPDATE",
                         )
-                        const xml = await unpackElementsMessage(
-                            payload,
-                            this.secretKey,
-                        )
-                        console.log(
-                            "[WebSocketCollab] ✅ Elements update received, XML length:",
-                            xml.length,
-                        )
-                        this.options.onRemoteChange?.(xml)
+                        // ELEMENTS_UPDATE 数据是 Yjs 二进制更新
+                        // 传递 Uint8Array 给上层处理
+                        this.options.onRemoteChange?.(payload)
                     }
                     break
 
@@ -318,10 +315,10 @@ export class WebSocketCollaboration {
     }
 
     /**
-     * 推送绘图更新到服务器（OpCode: 0x02）
-     * @param xml XML 字符串,会被加密后发送
+     * 推送二进制数据到服务器（OpCode: 0x02）
+     * @param data Uint8Array Yjs 二进制更新
      */
-    async pushUpdate(xml: string) {
+    async pushBinaryUpdate(data: Uint8Array) {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
             console.warn(
                 "[WebSocketCollab] ⚠️ WebSocket not connected, skipping push",
@@ -337,18 +334,20 @@ export class WebSocketCollaboration {
         }
 
         try {
-            // 打包消息（添加协议头）
-            const packet = await packElementsMessage(xml, this.secretKey)
+            // 构造协议包: opcode(1 byte) + payload
+            const packet = new Uint8Array(1 + data.length)
+            packet[0] = 0x02 // ELEMENTS_UPDATE
+            packet.set(data, 1)
 
             console.log(
-                `[WebSocketCollab] 📤 Sending ELEMENTS_UPDATE, original size: ${xml.length}, total: ${packet.length} bytes`,
+                `[WebSocketCollab] 📤 Sending binary ELEMENTS_UPDATE, data size: ${data.length}, total: ${packet.length} bytes`,
             )
 
             // 发送二进制数据
             this.ws.send(packet)
         } catch (error) {
             console.error(
-                "[WebSocketCollab] Failed to encrypt and send:",
+                "[WebSocketCollab] Failed to send binary data:",
                 error,
             )
         }
@@ -381,8 +380,14 @@ export class WebSocketCollaboration {
                 timestamp: Date.now(),
             }
 
-            // 打包消息
-            const packet = await packPointerMessage(pointer, this.secretKey)
+            // 将指针数据序列化为 JSON 字符串
+            const jsonStr = JSON.stringify(pointer)
+            const jsonBytes = new TextEncoder().encode(jsonStr)
+
+            // 构造协议包: opcode(1 byte) + payload
+            const packet = new Uint8Array(1 + jsonBytes.length)
+            packet[0] = 0x01 // POINTER
+            packet.set(jsonBytes, 1)
 
             // 发送（不打印日志，避免刷屏）
             this.ws.send(packet)
@@ -416,8 +421,14 @@ export class WebSocketCollaboration {
                 timestamp: Date.now(),
             }
 
-            // 打包消息
-            const packet = await packSyncMessage(syncRequest, this.secretKey)
+            // 将同步请求序列化为 JSON 字符串
+            const jsonStr = JSON.stringify(syncRequest)
+            const jsonBytes = new TextEncoder().encode(jsonStr)
+
+            // 构造协议包: opcode(1 byte) + payload
+            const packet = new Uint8Array(1 + jsonBytes.length)
+            packet[0] = 0x00 // FULL_SYNC
+            packet.set(jsonBytes, 1)
 
             console.log(
                 `[WebSocketCollab] 📤 Requesting full sync, total: ${packet.length} bytes`,
@@ -464,14 +475,33 @@ export class WebSocketCollaboration {
      * 销毁协作实例
      */
     dispose() {
+        console.log("[WebSocketCollab] Disposing instance...")
         this.isDisposed = true
+
+        // 清除重连定时器
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout)
+            this.reconnectTimeout = null
         }
+
+        // 关闭 WebSocket 连接
         if (this.ws) {
-            this.ws.close()
+            // 移除事件监听器，防止触发重连
+            this.ws.onclose = null
+            this.ws.onerror = null
+            this.ws.onopen = null
+            this.ws.onmessage = null
+
+            if (
+                this.ws.readyState === WebSocket.OPEN ||
+                this.ws.readyState === WebSocket.CONNECTING
+            ) {
+                this.ws.close(1000, "Client closing") // 使用正常关闭码
+            }
             this.ws = null
         }
+
+        console.log("[WebSocketCollab] Instance disposed")
     }
 }
 
