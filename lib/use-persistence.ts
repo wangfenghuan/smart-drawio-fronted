@@ -4,16 +4,22 @@
  * 核心功能:
  * 1. 监听图表变化
  * 2. 防抖延迟(默认 2000ms)
- * 3. 加密数据
- * 4. 调用后端保存接口
+ * 3. 抢锁机制（防止多客户端并发保存）
+ * 4. 加密数据
+ * 5. 调用后端上传快照接口
  *
  * 与 handleAutoSave 的区别:
  * - handleAutoSave: 用于 WebSocket 实时广播
- * - usePersistence: 用于 HTTP 持久化到数据库
+ * - usePersistence: 用于 HTTP 持久化到数据库（带抢锁机制）
+ *
+ * 抢锁机制说明:
+ * - 多个客户端同时编辑时，抢到锁的客户端负责上传快照
+ * - 抢锁成功后有 5 分钟的冷却期
+ * - 冷却期内其他客户端无法抢锁
  */
 
-import { useEffect, useRef } from "react"
-import { save as saveRoom } from "@/api/roomController"
+import { useEffect, useRef, useState } from "react"
+import { checkLock, uploadSnapshot } from "@/api/diagramController"
 import { encryptData } from "./cryptoUtils"
 
 export interface UsePersistenceOptions {
@@ -51,6 +57,12 @@ export interface UsePersistenceOptions {
      * 保存失败回调
      */
     onSaveError?: (error: any) => void
+
+    /**
+     * 是否启用抢锁机制（默认启用）
+     * 启用后，只有抢到锁的客户端才会保存快照
+     */
+    enableLock?: boolean
 }
 
 export function usePersistence({
@@ -61,10 +73,17 @@ export function usePersistence({
     debounceMs = 2000,
     onSaveSuccess,
     onSaveError,
+    enableLock = true,
 }: UsePersistenceOptions) {
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const lastSavedXmlRef = useRef<string>("")
     const isSavingRef = useRef<boolean>(false)
+
+    // 使用 ref 而不是 state，避免触发重新渲染导致无限循环
+    const lockStatusRef = useRef<{
+        hasLock: boolean
+        message: string
+    }>({ hasLock: false, message: "" })
 
     useEffect(() => {
         // 如果未启用或没有数据,直接返回
@@ -91,12 +110,74 @@ export function usePersistence({
 
         // 设置新的定时器
         saveTimeoutRef.current = setTimeout(async () => {
-            console.log("[usePersistence] 💾 Saving to backend...")
+            console.log("[usePersistence] 💾 Attempting to save to backend...")
 
             try {
                 isSavingRef.current = true
 
-                // 加密数据
+                // Step 1: 抢锁（如果启用）
+                if (enableLock) {
+                    console.log("[usePersistence] 🔒 Trying to acquire lock...")
+                    try {
+                        const lockResponse = await checkLock({
+                            roomId: roomId as any, // 使用字符串避免精度丢失
+                        })
+
+                        console.log(
+                            "[usePersistence] 🔒 Lock response:",
+                            lockResponse,
+                        )
+
+                        // 检查响应：code === 0 表示成功，data === true 表示抢到锁
+                        const lockAcquired =
+                            lockResponse?.code === 0 &&
+                            lockResponse?.data === true
+
+                        console.log(
+                            "[usePersistence] 🔒 Lock acquired:",
+                            lockAcquired,
+                            {
+                                code: lockResponse?.code,
+                                data: lockResponse?.data,
+                            },
+                        )
+
+                        if (!lockAcquired) {
+                            console.log(
+                                "[usePersistence] ❌ Lock not acquired, another client is saving",
+                            )
+                            lockStatusRef.current = {
+                                hasLock: false,
+                                message: "其他客户端正在保存，跳过本次保存",
+                            }
+                            // 没抢到锁，放弃保存
+                            return
+                        }
+
+                        console.log(
+                            "[usePersistence] ✅ Lock acquired! This client will save the snapshot",
+                        )
+                        lockStatusRef.current = {
+                            hasLock: true,
+                            message: "已获得锁，正在保存快照...",
+                        }
+                    } catch (lockError) {
+                        console.error(
+                            "[usePersistence] ❌ Check lock failed:",
+                            lockError,
+                        )
+                        // 抢锁失败，可以选择放弃保存或重试
+                        // 这里选择放弃保存，避免并发冲突
+                        lockStatusRef.current = {
+                            hasLock: false,
+                            message: "抢锁失败，跳过本次保存",
+                        }
+                        return
+                    }
+                }
+
+                // Step 2: 加密数据
+                console.log("[usePersistence] 🔒 Encrypting data...")
                 const encryptedData = await encryptData(xml, secretKey)
                 console.log(
                     "[usePersistence] 🔒 Data encrypted, size:",
@@ -109,14 +190,32 @@ export function usePersistence({
                 ).join("")
                 const base64Data = btoa(binaryString)
 
-                // 调用后端接口保存
-                await saveRoom({ roomId: roomId }, base64Data)
+                // Step 3: 上传快照到后端
+                console.log("[usePersistence] 📤 Uploading snapshot...")
+                const uploadResponse = await uploadSnapshot(
+                    { roomId: roomId as any }, // 使用字符串避免精度丢失
+                    base64Data,
+                )
 
-                console.log("[usePersistence] ✅ Saved successfully")
-                lastSavedXmlRef.current = xml
-                onSaveSuccess?.()
+                if (uploadResponse?.code === 0) {
+                    console.log(
+                        "[usePersistence] ✅ Snapshot uploaded successfully",
+                    )
+                    lastSavedXmlRef.current = xml
+                    lockStatusRef.current = {
+                        hasLock: false,
+                        message: "快照保存成功",
+                    }
+                    onSaveSuccess?.()
+                } else {
+                    throw new Error(uploadResponse?.message || "上传快照失败")
+                }
             } catch (error) {
                 console.error("[usePersistence] ❌ Save failed:", error)
+                lockStatusRef.current = {
+                    hasLock: false,
+                    message: `保存失败: ${error}`,
+                }
                 onSaveError?.(error)
             } finally {
                 isSavingRef.current = false
@@ -153,7 +252,63 @@ export function usePersistence({
         try {
             isSavingRef.current = true
 
-            // 加密数据
+            // Step 1: 抢锁（如果启用）
+            if (enableLock) {
+                console.log("[usePersistence] 🔒 Trying to acquire lock...")
+                try {
+                    const lockResponse = await checkLock({
+                        roomId: roomId as any, // 使用字符串避免精度丢失
+                    })
+
+                    console.log(
+                        "[usePersistence] 🔒 Lock response (manual):",
+                        lockResponse,
+                    )
+
+                    // 检查响应：code === 0 表示成功，data === true 表示抢到锁
+                    const lockAcquired =
+                        lockResponse?.code === 0 && lockResponse?.data === true
+
+                    console.log(
+                        "[usePersistence] 🔒 Lock acquired (manual):",
+                        lockAcquired,
+                        {
+                            code: lockResponse?.code,
+                            data: lockResponse?.data,
+                        },
+                    )
+
+                    if (!lockAcquired) {
+                        console.log(
+                            "[usePersistence] ❌ Lock not acquired, another client is saving",
+                        )
+                        lockStatusRef.current = {
+                            hasLock: false,
+                            message: "其他客户端正在保存",
+                        }
+                        return
+                    }
+
+                    console.log("[usePersistence] ✅ Lock acquired!")
+                    lockStatusRef.current = {
+                        hasLock: true,
+                        message: "已获得锁，正在保存...",
+                    }
+                } catch (lockError) {
+                    console.error(
+                        "[usePersistence] ❌ Check lock failed:",
+                        lockError,
+                    )
+                    lockStatusRef.current = {
+                        hasLock: false,
+                        message: "抢锁失败",
+                    }
+                    return
+                }
+            }
+
+            // Step 2: 加密数据
+            console.log("[usePersistence] 🔒 Encrypting data...")
             const encryptedData = await encryptData(xml, secretKey)
             console.log(
                 "[usePersistence] 🔒 Data encrypted, size:",
@@ -166,14 +321,30 @@ export function usePersistence({
             ).join("")
             const base64Data = btoa(binaryString)
 
-            // 调用后端接口保存
-            await saveRoom({ roomId: roomId }, base64Data)
+            // Step 3: 上传快照
+            console.log("[usePersistence] 📤 Uploading snapshot...")
+            const uploadResponse = await uploadSnapshot(
+                { roomId: roomId as any }, // 使用字符串避免精度丢失
+                base64Data,
+            )
 
-            console.log("[usePersistence] ✅ Manual save succeeded")
-            lastSavedXmlRef.current = xml
-            onSaveSuccess?.()
+            if (uploadResponse?.code === 0) {
+                console.log("[usePersistence] ✅ Manual save succeeded")
+                lastSavedXmlRef.current = xml
+                lockStatusRef.current = {
+                    hasLock: false,
+                    message: "保存成功",
+                }
+                onSaveSuccess?.()
+            } else {
+                throw new Error(uploadResponse?.message || "上传快照失败")
+            }
         } catch (error) {
             console.error("[usePersistence] ❌ Manual save failed:", error)
+            lockStatusRef.current = {
+                hasLock: false,
+                message: `保存失败: ${error}`,
+            }
             onSaveError?.(error)
         } finally {
             isSavingRef.current = false
@@ -193,5 +364,6 @@ export function usePersistence({
         manualSave,
         flush,
         isSaving: isSavingRef.current,
+        lockStatus: lockStatusRef.current,
     }
 }
