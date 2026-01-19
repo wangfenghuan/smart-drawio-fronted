@@ -132,16 +132,16 @@ declare namespace API {
     }
 
     type checkLockParams = {
-        roomId: string
+        roomId: number
     }
 
     type Conversion = {
         /** 主键ID */
-        id?: string
+        id?: number
         /** 用户ID */
-        userId?: string
+        userId?: number
         /** 图表ID */
-        diagramId?: string
+        diagramId?: number
         /** 消息类型(user代表用户，ai代表AI回复) */
         messageType?: string
         /** 消息内容 */
@@ -168,14 +168,14 @@ declare namespace API {
     }
 
     type DeleteRequest = {
-        id?: string
+        id?: number
     }
 
     type Diagram = {
         /** 图表主键ID */
-        id?: string
+        id?: number
         /** 用户ID */
-        userId?: string
+        userId?: number
         /** 图表代码 */
         diagramCode?: string
         /** 图表名称 */
@@ -185,7 +185,7 @@ declare namespace API {
         /** 图片URL */
         pictureUrl?: string
         /** 空间id */
-        spaceId?: string
+        spaceId?: number
         /** 矢量图URL */
         svgUrl?: string
         /** SVG文件大小（字节） */
@@ -208,19 +208,19 @@ declare namespace API {
         /** 图表代码 */
         diagramCode?: string
         /** 空间id */
-        spaceId?: string
+        spaceId?: number
         /** 图片URL */
         pictureUrl?: string
     }
 
     type DiagramEditRequest = {
         /** 图表ID */
-        id?: string
+        id?: number
         /** 图表标题 */
         title?: string
         /** 图表描述 */
         description?: string
-        spaceId?: string
+        spaceId?: number
         /** 图表代码 */
         diagramCode?: string
         /** 图片URL */
@@ -233,30 +233,30 @@ declare namespace API {
         sortField?: string
         sortOrder?: string
         /** 图表ID */
-        id?: string
+        id?: number
+        /** 空间id（可选，空代表查询公共空间） */
+        spaceId?: number
         /** 搜索关键词 */
         searchText?: string
         /** 图表标题 */
         title?: string
         /** 图表代码 */
         diagramCode?: string
-        /** 空间 id */
-        spaceId?: string
         /** 是否只查询 spaceId 为 null 的数据 */
         nullSpaceId?: boolean
         /** 创建用户ID */
-        userId?: string
+        userId?: number
     }
 
     type DiagramRoom = {
         /** 房间ID */
-        id?: string
+        id?: number
         /** 房间名称 */
         roomName?: string
         /** 图表ID */
-        diagramId?: string
+        diagramId?: number
         /** 创建者ID */
-        ownerId?: string
+        ownerId?: number
         /** 加密后的图表数据 */
         encryptedData?: string
         /** 访问地址 */
@@ -276,12 +276,12 @@ declare namespace API {
         /** 访问密码 */
         accessKey?: string
         /** 空间ID */
-        spaceId?: string
+        spaceId?: number
     }
 
     type DiagramUpdateRequest = {
         /** 图表ID */
-        id?: string
+        id?: number
         /** 图表标题 */
         name?: string
         /** 图表代码 */
@@ -291,33 +291,33 @@ declare namespace API {
         /** 图表描述 */
         description?: string
         /** 空间id */
-        spaceId?: string
+        spaceId?: number
     }
 
     type DiagramUploadRequest = {
         /** 业务类型 */
         biz?: string
         /** 图表ID */
-        diagramId?: string
+        diagramId?: number
         /** 用户ID */
-        userId?: string
+        userId?: number
         /** 空间ID */
-        spaceId?: string
+        spaceId?: number
     }
 
     type DiagramVO = {
         /** 图表ID */
-        id?: string
+        id?: number
         /** 图表标题 */
         name?: string
         /** 创建用户ID */
-        userId?: string
+        userId?: number
         /** 图片URL */
         pictureUrl?: string
         /** 矢量图URL */
         svgUrl?: string
         /** 空间id */
-        spaceId?: string
+        spaceId?: number
         /** 创建时间 */
         createTime?: string
         /** 更新时间 */
@@ -339,36 +339,36 @@ declare namespace API {
     type downloadRemoteFileParams = {
         fileName?: string
         type: string
-        diagramId: string
+        diagramId: number
     }
 
     type getDiagramRoomVOByIdParams = {
-        id: string
+        id: number
     }
 
     type getDiagramVOByIdParams = {
-        id: string
+        id: number
     }
 
     type getRoomDiagramVOParams = {
-        diagramId: string
-        roomId: string
+        diagramId: number
+        roomId: number
     }
 
     type getSpaceByIdParams = {
-        id: string
+        id: number
     }
 
     type getSpaceVOByIdParams = {
-        id: string
+        id: number
     }
 
     type getUserByIdParams = {
-        id: string
+        id: number
     }
 
     type getUserVOByIdParams = {
-        id: string
+        id: number
     }
 
     type GrantedAuthority = {
@@ -376,18 +376,14 @@ declare namespace API {
     }
 
     type listDiagramChatHistoryParams = {
-        diagramId: string
+        diagramId: number
         pageSize?: number
         lasteCreateTime?: string
     }
 
-    type listDiagramsBySpaceIdParams = {
-        spaceId: string
-    }
-
     type LoginUserVO = {
         /** 用户ID */
-        id?: string
+        id?: number
         /** 用户昵称 */
         userName?: string
         /** 用户头像 */
@@ -537,14 +533,14 @@ declare namespace API {
         /** 房间名称 */
         roomName?: string
         /** 图表ID */
-        diagramId?: string
+        diagramId?: number
         /** 空间ID */
-        spaceId?: string
+        spaceId?: number
     }
 
     type RoomEditRequest = {
         /** 房间ID */
-        id?: string
+        id?: number
         /** 房间名称 */
         roomName?: string
         /** 是否公开（0公开，1私有） */
@@ -563,15 +559,15 @@ declare namespace API {
         sortField?: string
         sortOrder?: string
         /** 房间ID */
-        id?: string
+        id?: number
         /** 房间名称 */
         roomName?: string
         /** 搜索关键词 */
         searchText?: string
         /** 图表ID */
-        diagramId?: string
+        diagramId?: number
         /** 创建者ID */
-        owerId?: string
+        owerId?: number
         /** 是否公开（0公开，1私有） */
         isPublic?: number
         /** 创建时间 */
@@ -581,14 +577,14 @@ declare namespace API {
         /** 是否关闭（0开启，1关闭） */
         isOpen?: number
         /** 空间ID */
-        spaceId?: string
+        spaceId?: number
         /** 是否查询空空间id的记录 */
         nullSpaceId?: boolean
     }
 
     type RoomUpdateRequest = {
         /** 房间ID */
-        id?: string
+        id?: number
         /** 房间名称 */
         roomName?: string
         /** 是否公开（0公开，1私有） */
@@ -601,20 +597,20 @@ declare namespace API {
 
     type RoomUrlEditRequest = {
         /** 房间ID */
-        id?: string
+        id?: number
         /** 访问地址 */
         roomUrl?: string
     }
 
     type RoomVO = {
         /** 房间ID */
-        id?: string
+        id?: number
         /** 房间名称 */
         roomName?: string
         /** 图表ID */
-        diagramId?: string
+        diagramId?: number
         /** 创建者ID */
-        ownerId?: string
+        ownerId?: number
         /** 是否公开（0公开，1私有） */
         isPublic?: number
         /** 是否删除（0未删除，1已删除） */
@@ -630,15 +626,15 @@ declare namespace API {
         /** 创建用户信息 */
         userVO?: UserVO
         /** 空间id */
-        spaceId?: string
+        spaceId?: number
     }
 
     type saveParams = {
-        roomId: string
+        roomId: number
     }
 
     type Space = {
-        id?: string
+        id?: number
         spaceName?: string
         spaceLevel?: number
         maxSize?: number
@@ -646,7 +642,7 @@ declare namespace API {
         totalSize?: number
         totalCount?: number
         spaceType?: number
-        userId?: string
+        userId?: number
         createTime?: string
         editTime?: string
         updateTime?: string
@@ -657,11 +653,11 @@ declare namespace API {
         spaceName?: string
         spaceLevel?: number
         spaceType?: number
-        userId?: string
+        userId?: number
     }
 
     type SpaceEditRequest = {
-        id?: string
+        id?: number
         spaceName?: string
     }
 
@@ -681,15 +677,15 @@ declare namespace API {
         pageSize?: number
         sortField?: string
         sortOrder?: string
-        id?: string
-        userId?: string
+        id?: number
+        userId?: number
         spaceName?: string
         spaceType?: number
         spaceLevel?: number
     }
 
     type SpaceUpdateRequest = {
-        id?: string
+        id?: number
         spaceName?: string
         spaceLevel?: number
         maxSize?: number
@@ -699,44 +695,44 @@ declare namespace API {
     }
 
     type SpaceUser = {
-        id?: string
-        spaceId?: string
-        userId?: string
+        id?: number
+        spaceId?: number
+        userId?: number
         spaceRole?: string
         authorities?: GrantedAuthority[]
         createTime?: string
         updateTime?: string
         isDelete?: number
         enabled?: boolean
-        accountNonExpired?: boolean
-        accountNonLocked?: boolean
         username?: string
         password?: string
+        accountNonExpired?: boolean
+        accountNonLocked?: boolean
         credentialsNonExpired?: boolean
     }
 
     type SpaceUserAddRequest = {
-        spaceId?: string
-        userId?: string
+        spaceId?: number
+        userId?: number
         spaceRole?: string
     }
 
     type SpaceUserEditRequest = {
-        id?: string
+        id?: number
         spaceRole?: string
     }
 
     type SpaceUserQueryRequest = {
-        id?: string
-        spaceId?: string
-        userId?: string
+        id?: number
+        spaceId?: number
+        userId?: number
         spaceRole?: string
     }
 
     type SpaceUserVO = {
-        id?: string
-        spaceId?: string
-        userId?: string
+        id?: number
+        spaceId?: number
+        userId?: number
         spaceRole?: string
         createTime?: string
         updateTime?: string
@@ -745,7 +741,7 @@ declare namespace API {
     }
 
     type SpaceVO = {
-        id?: string
+        id?: number
         spaceName?: string
         spaceType?: number
         spaceLevel?: number
@@ -753,7 +749,7 @@ declare namespace API {
         maxCount?: number
         totalSize?: number
         totalCount?: number
-        userId?: string
+        userId?: number
         createTime?: string
         editTime?: string
         updateTime?: string
@@ -774,12 +770,12 @@ declare namespace API {
     }
 
     type uploadSnapshotParams = {
-        roomId: string
+        roomId: number
     }
 
     type User = {
         /** 用户ID */
-        id?: string
+        id?: number
         /** 用户账号 */
         userAccount?: string
         /** 用户密码 */
@@ -803,10 +799,10 @@ declare namespace API {
         /** 是否删除（0未删除，1已删除） */
         isDelete?: number
         enabled?: boolean
-        accountNonExpired?: boolean
-        accountNonLocked?: boolean
         username?: string
         password?: string
+        accountNonExpired?: boolean
+        accountNonLocked?: boolean
         credentialsNonExpired?: boolean
     }
 
@@ -854,6 +850,8 @@ declare namespace API {
         userPassword?: string
         /** 确认密码 */
         checkPassword?: string
+        /** 用户昵称 */
+        userName?: string
     }
 
     type UserUpdateMyRequest = {
@@ -867,7 +865,7 @@ declare namespace API {
 
     type UserUpdateRequest = {
         /** 用户ID */
-        id?: string
+        id?: number
         /** 用户昵称 */
         userName?: string
         /** 用户头像 */
@@ -880,7 +878,7 @@ declare namespace API {
 
     type UserVO = {
         /** 用户ID */
-        id?: string
+        id?: number
         /** 用户昵称 */
         userName?: string
         /** 用户头像 */

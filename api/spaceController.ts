@@ -4,11 +4,7 @@ import request from "@/lib/request"
 
 /** 创建空间 POST /space/add */
 export async function addSpace(
-    body: {
-        spaceName?: string
-        spaceLevel?: number
-        spaceType?: number
-    },
+    body: API.SpaceAddReqeust,
     options?: { [key: string]: any },
 ) {
     return request<API.BaseResponseLong>("/space/add", {
@@ -125,6 +121,34 @@ export async function getSpaceVoById(
     })
 }
 
+/** 查询我加入的空间 查询当前登录用户加入的所有团队空间。
+
+**权限要求：**
+- 需要登录
+- 只能查询自己作为成员加入的团队空间
+
+**功能说明：**
+- 查询用户在 space_user 表中有关联记录的团队空间
+- 不包括用户自己创建的私有空间
+
+**限制条件：**
+- 每页最多20条（防止爬虫）
+- 支持按名称、级别等条件筛选
+ POST /space/joined/list/page/vo */
+export async function listJoinedSpaceVoByPage(
+    body: API.SpaceQueryRequest,
+    options?: { [key: string]: any },
+) {
+    return request<API.BaseResponsePageSpaceVO>("/space/joined/list/page/vo", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        data: body,
+        ...(options || {}),
+    })
+}
+
 /** 查询空间下的图表列表 查询指定空间下的所有图表。
 
 **权限要求：**
@@ -139,7 +163,7 @@ export async function getSpaceVoById(
 
 **限制条件：**
 - 每页最多20条（防止爬虫）
- POST /space/list/diagrams/${param0} */
+ POST /space/list/diagrams */
 export async function listDiagramsBySpaceId(
     body: API.DiagramQueryRequest,
     options?: { [key: string]: any },

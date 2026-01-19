@@ -11,6 +11,7 @@ import {
     SearchOutlined,
     TeamOutlined,
     UserOutlined,
+    UserSwitchOutlined,
 } from "@ant-design/icons"
 import {
     App,
@@ -36,6 +37,7 @@ import {
     deleteSpace,
     editSpace,
     getSpaceVoById,
+    listJoinedSpaceVoByPage,
     listMySpaceVoByPage,
     listSpaceLevel,
 } from "@/api/spaceController"
@@ -66,6 +68,9 @@ export default function MySpacesPage() {
     const [spaceTypeFilter, setSpaceTypeFilter] = useState<number | undefined>(
         undefined,
     )
+    const [spaceSourceFilter, setSpaceSourceFilter] = useState<
+        "created" | "joined"
+    >("created")
     const [createModalVisible, setCreateModalVisible] = useState(false)
     const [editModalVisible, setEditModalVisible] = useState(false)
     const [detailModalVisible, setDetailModalVisible] = useState(false)
@@ -154,16 +159,32 @@ export default function MySpacesPage() {
         setLoading(true)
 
         try {
-            const response = await listMySpaceVoByPage({
-                current: current,
-                pageSize: pageSize,
-                ...(searchText && { spaceName: searchText }),
-                ...(spaceTypeFilter !== undefined && {
-                    spaceType: spaceTypeFilter,
-                }),
-                sortField: "createTime",
-                sortOrder: "desc",
-            })
+            // 根据空间来源筛选调用不同的API
+            // 注意：后端接口功能是反的
+            // - listMySpaceVoByPage (/space/my/list/page/vo) 实际查询的是"我加入的"
+            // - listJoinedSpaceVoByPage (/space/joined/list/page/vo) 实际查询的是"我创建的"
+            const response =
+                spaceSourceFilter === "created"
+                    ? await listJoinedSpaceVoByPage({
+                          current: current,
+                          pageSize: pageSize,
+                          ...(searchText && { spaceName: searchText }),
+                          ...(spaceTypeFilter !== undefined && {
+                              spaceType: spaceTypeFilter,
+                          }),
+                          sortField: "createTime",
+                          sortOrder: "desc",
+                      })
+                    : await listMySpaceVoByPage({
+                          current: current,
+                          pageSize: pageSize,
+                          ...(searchText && { spaceName: searchText }),
+                          ...(spaceTypeFilter !== undefined && {
+                              spaceType: spaceTypeFilter,
+                          }),
+                          sortField: "createTime",
+                          sortOrder: "desc",
+                      })
 
             if (response?.code === 0 && response?.data) {
                 const data = response.data
@@ -218,6 +239,13 @@ export default function MySpacesPage() {
     // 空间类型筛选触发
     const handleSpaceTypeFilter = (value: number | undefined) => {
         setSpaceTypeFilter(value)
+        setPagination((prev) => ({ ...prev, current: 1 }))
+        loadSpaces(1, pagination.pageSize)
+    }
+
+    // 空间来源筛选触发
+    const handleSpaceSourceFilter = (value: "created" | "joined") => {
+        setSpaceSourceFilter(value)
         setPagination((prev) => ({ ...prev, current: 1 }))
         loadSpaces(1, pagination.pageSize)
     }
@@ -386,6 +414,7 @@ export default function MySpacesPage() {
                         display: "flex",
                         gap: "16px",
                         alignItems: "center",
+                        flexWrap: "wrap",
                     }}
                 >
                     <Search
@@ -398,6 +427,27 @@ export default function MySpacesPage() {
                         onSearch={handleSearch}
                         style={{ maxWidth: "400px" }}
                     />
+                    <Radio.Group
+                        value={spaceSourceFilter}
+                        onChange={(e) =>
+                            handleSpaceSourceFilter(e.target.value)
+                        }
+                        size="large"
+                        buttonStyle="solid"
+                    >
+                        <Radio.Button value="joined">
+                            <Space size="small">
+                                <UserSwitchOutlined />
+                                我加入的
+                            </Space>
+                        </Radio.Button>
+                        <Radio.Button value="created">
+                            <Space size="small">
+                                <UserOutlined />
+                                我创建的
+                            </Space>
+                        </Radio.Button>
+                    </Radio.Group>
                     <Select
                         placeholder="筛选空间类型"
                         allowClear
