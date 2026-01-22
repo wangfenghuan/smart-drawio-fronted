@@ -12,7 +12,7 @@ export default function DiagramViewPage() {
     const diagramId = params.id as string
 
     const [diagramTitle, setDiagramTitle] = useState("")
-    const [svgUrl, setSvgUrl] = useState("")
+    const [imageUrl, setImageUrl] = useState("")
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -20,7 +20,10 @@ export default function DiagramViewPage() {
             const response = await getDiagramVoById({ id: diagramId })
             if (response?.data) {
                 setDiagramTitle(response.data.name || "未命名图表")
-                setSvgUrl(response.data.svgUrl || "")
+                // 优先使用 pictureUrl，其次使用 svgUrl
+                setImageUrl(
+                    response.data.pictureUrl || response.data.svgUrl || "",
+                )
             }
             setLoading(false)
         }
@@ -70,9 +73,9 @@ export default function DiagramViewPage() {
             >
                 {loading ? (
                     <div>加载中...</div>
-                ) : svgUrl ? (
+                ) : imageUrl ? (
                     <img
-                        src={svgUrl}
+                        src={imageUrl}
                         alt={diagramTitle}
                         style={{
                             maxWidth: "100%",

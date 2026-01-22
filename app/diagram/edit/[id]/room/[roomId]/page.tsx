@@ -39,6 +39,8 @@ export default function DrawioHome() {
         isDrawioReady,
         toggleCollaboration,
         collaborationEnabled,
+        handleExportWithoutHistory,
+        resolverRef,
     } = useDiagram()
     const { saveDiagram, downloadDiagram, handleExportCallback } =
         useDiagramSave(drawioRef)
