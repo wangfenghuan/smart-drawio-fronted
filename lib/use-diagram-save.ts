@@ -250,36 +250,38 @@ export function useDiagramSave(drawioRef: React.Ref<DrawIoEmbedRef | null>) {
             try {
                 toast.loading("正在准备下载...", { id: "download-diagram" })
 
-                const API_BASE_URL =
-                    process.env.NEXT_PUBLIC_API_BASE_URL ||
-                    "http://localhost:8081/api"
-
-                // 适配后端的 downloadRemoteFile 参数: fileName, type, diagramId
-                const params = new URLSearchParams({
-                    type: format.toUpperCase(), // SVG, PNG, XML
-                    diagramId: String(diagramId),
-                    fileName: filename,
-                })
-
-                const response = await fetch(
-                    `${API_BASE_URL}/diagram/stream-download?${params.toString()}`,
-                    {
-                        method: "GET",
-                        credentials: "include",
-                    },
+                // 1. 直接从编辑器导出最新数据 (Client-side)
+                // 这样可以确保下载的是当前正在编辑的内容，不需要先保存到后端
+                const data = await exportDiagram(
+                    format.toLowerCase() as "xml" | "png" | "svg",
                 )
 
-                if (!response.ok) {
-                    throw new Error(`下载失败: ${response.statusText}`)
+                if (!data) {
+                    throw new Error("导出数据为空")
                 }
 
-                const blob = await response.blob()
-                const url = URL.createObjectURL(blob)
+                // 2. 转换格式
+                let mimeType = "text/plain"
+                let ext = format.toLowerCase()
+
+                if (format === "PNG") {
+                    mimeType = "image/png"
+                    // dataToFile 已经处理了 base64
+                } else if (format === "SVG") {
+                    mimeType = "image/svg+xml"
+                } else if (format === "XML") {
+                    mimeType = "application/xml"
+                    ext = "drawio"
+                }
+
+                // 3. 生成文件对象
+                const file = dataToFile(data, `${filename}.${ext}`, mimeType)
+
+                // 4. 触发浏览器下载
+                const url = URL.createObjectURL(file)
                 const a = document.createElement("a")
                 a.href = url
-                // 根据 format 决定后缀
-                const ext = format === "xml" ? "drawio" : format.toLowerCase()
-                a.download = `${filename}.${ext}`
+                a.download = file.name
                 document.body.appendChild(a)
                 a.click()
                 document.body.removeChild(a)
@@ -296,7 +298,7 @@ export function useDiagramSave(drawioRef: React.Ref<DrawIoEmbedRef | null>) {
                 )
             }
         },
-        [],
+        [exportDiagram],
     )
 
     return {

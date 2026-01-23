@@ -14,13 +14,13 @@ import {
 import { useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { useSelector } from "react-redux"
-import rehypeHighlight from "rehype-highlight"
 import remarkGfm from "remark-gfm"
 import { toast } from "sonner"
 import { listDiagramChatHistory } from "@/api/conversionController"
 import type { API } from "@/api/typings"
 import { AIConfigDialog, useAIConfig } from "@/components/ai-config-dialog"
 import { CodeBlock } from "@/components/code-block"
+import { CollaborationPanel } from "@/components/collaboration-panel"
 import { DownloadDialog } from "@/components/download-dialog"
 import { removeThinkingTags, ThinkingBlock } from "@/components/thinking-block"
 import { Button } from "@/components/ui/button"
@@ -34,7 +34,6 @@ import { type Message, useBackendChat } from "@/lib/use-backend-chat"
 import { useDiagramSave } from "@/lib/use-diagram-save"
 import { parseXmlAndLoadDiagram } from "@/lib/utils"
 import type { RootState } from "@/stores"
-import "highlight.js/styles/github-dark.css"
 
 interface SimpleChatPanelProps {
     diagramId: string
@@ -42,6 +41,7 @@ interface SimpleChatPanelProps {
     onToggleVisibility: () => void
     darkMode: boolean
     diagramTitle: string
+    spaceId?: number
 }
 
 export default function SimpleChatPanel({
@@ -50,6 +50,7 @@ export default function SimpleChatPanel({
     onToggleVisibility,
     darkMode,
     diagramTitle,
+    spaceId,
 }: SimpleChatPanelProps) {
     const [input, setInput] = useState("")
     const [historyLoaded, setHistoryLoaded] = useState(false)
@@ -264,7 +265,7 @@ export default function SimpleChatPanel({
                 timeoutPromise,
             ])
 
-            // 成功提示已经在 saveDiagramToServer 内部处理了
+            toast.success("保存成功")
         } catch (error) {
             console.error("保存图表异常:", error)
             toast.error(
@@ -296,7 +297,7 @@ export default function SimpleChatPanel({
     return (
         <div className="h-full w-full flex flex-col bg-gradient-to-b from-slate-900 to-slate-800 rounded-r-2xl overflow-hidden relative">
             {/* 顶部工具栏 */}
-            <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-black/20 z-10">
+            <div className="flex-shrink-0 flex items-center justify-between px-2 py-3 border-b border-white/10 bg-black/20 z-10">
                 <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
                     <MessageSquare className="h-4 w-4 text-blue-400 flex-shrink-0" />
                     <h2 className="text-sm font-semibold text-white whitespace-nowrap">
@@ -304,11 +305,13 @@ export default function SimpleChatPanel({
                     </h2>
                 </div>
 
-                <div className="flex items-center gap-5 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    <CollaborationPanel spaceId={spaceId} />
+
                     <button
                         onClick={handleSaveDiagram}
                         disabled={isSaving || !chartXML}
-                        className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 border flex-shrink-0
+                        className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-105 border flex-shrink-0
                             ${
                                 isSaving || !chartXML
                                     ? "bg-gray-500/10 text-gray-500 border-transparent cursor-not-allowed opacity-50"
@@ -325,7 +328,7 @@ export default function SimpleChatPanel({
 
                     <button
                         onClick={() => setConfigDialogOpen(true)}
-                        className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 flex-shrink-0 ${
+                        className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-105 flex-shrink-0 ${
                             aiConfig.mode === "custom"
                                 ? "bg-green-500/20 text-green-400 border border-green-500/30"
                                 : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10"
@@ -341,7 +344,7 @@ export default function SimpleChatPanel({
 
                     <button
                         onClick={() => setDownloadDialogOpen(true)}
-                        className="p-2 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 transition-all duration-200 hover:scale-105 flex-shrink-0"
+                        className="p-1.5 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 transition-all duration-200 hover:scale-105 flex-shrink-0"
                         title="下载图表"
                     >
                         <Download className="h-4 w-4" />
@@ -350,7 +353,7 @@ export default function SimpleChatPanel({
                     <button
                         onClick={handleClearChat}
                         disabled={messages.length === 0}
-                        className="p-2 rounded-lg bg-white/5 text-white/60 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-200 hover:scale-105 disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
+                        className="p-1.5 rounded-lg bg-white/5 text-white/60 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-200 hover:scale-105 disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
                         title="清空对话"
                     >
                         <Trash2 className="h-4 w-4" />
@@ -360,7 +363,7 @@ export default function SimpleChatPanel({
 
                     <button
                         onClick={onToggleVisibility}
-                        className="p-2 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 transition-all duration-200 hover:scale-105 flex-shrink-0"
+                        className="p-1.5 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 transition-all duration-200 hover:scale-105 flex-shrink-0"
                         title="隐藏面板"
                     >
                         <Square className="h-4 w-4" />
@@ -417,9 +420,6 @@ export default function SimpleChatPanel({
                                                     <ReactMarkdown
                                                         remarkPlugins={[
                                                             remarkGfm,
-                                                        ]}
-                                                        rehypePlugins={[
-                                                            rehypeHighlight,
                                                         ]}
                                                         components={{
                                                             code({

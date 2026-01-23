@@ -107,7 +107,7 @@ export function CollaborationPanel({ spaceId }: { spaceId?: number }) {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowSettings(!showSettings)}
-                className={`relative p-3 rounded-xl transition-all duration-200 hover:scale-105 ${
+                className={`relative p-1.5 rounded-lg transition-all duration-200 hover:scale-105 ${
                     collaborationEnabled
                         ? "bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30"
                         : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10"
@@ -118,7 +118,7 @@ export function CollaborationPanel({ spaceId }: { spaceId?: number }) {
                         : "开启协作"
                 }
             >
-                <Users className="h-6 w-6" />
+                <Users className="h-4 w-4" />
                 {collaborationEnabled && collaborationConnected && (
                     <span className="absolute -top-1 -right-1 flex h-3 w-3">
                         <span

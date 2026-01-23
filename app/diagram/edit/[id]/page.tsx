@@ -323,7 +323,7 @@ export default function DrawioHome() {
     }, [])
 
     return (
-        <div className="flex-1 w-full h-full p-3 relative overflow-hidden">
+        <div className="flex-1 w-full h-full relative overflow-hidden">
             <div
                 ref={containerRef}
                 className={`w-full h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-hidden shadow-2xl border border-white/10 transition-all duration-300 ${
@@ -332,54 +332,53 @@ export default function DrawioHome() {
                         : "rounded-2xl"
                 }`}
             >
-                {/* 工具栏 - 分散布局避免堆叠 */}
-                <div className="absolute top-5 right-5 z-20 flex items-center justify-between gap-8">
-                    {/* 协作面板 - 独立放在左侧 */}
-                    <div className="flex-shrink-0">
-                        <CollaborationPanel spaceId={currentSpaceId} />
-                    </div>
-
-                    {/* 右侧按钮组 */}
-                    <div className="flex items-center gap-4">
-                        {/* 保存按钮组 */}
-                        <div className="flex items-center gap-3">
-                            <DiagramToolbar
-                                diagramId={diagramId}
-                                title={diagramTitle}
-                                xml={chartXML}
-                                onSave={handleSave}
-                            />
-                        </div>
-
-                        {/* 分隔线 */}
-                        <div className="h-8 w-px bg-white/40"></div>
-
-                        {/* 全屏按钮 */}
-                        <button
-                            onClick={toggleFullscreen}
-                            className="p-3 rounded-xl bg-white/95 hover:bg-white text-gray-800 border border-gray-300 hover:border-gray-400 shadow-md transition-all duration-200 hover:scale-105"
-                            title={isFullscreen ? "退出全屏 (ESC)" : "全屏模式"}
-                        >
-                            {isFullscreen ? (
-                                <Minimize2 className="h-6 w-6" />
-                            ) : (
-                                <Maximize2 className="h-6 w-6" />
-                            )}
-                        </button>
-                    </div>
-                </div>
                 <ResizablePanelGroup
                     id="main-panel-group"
                     direction={isMobile ? "vertical" : "horizontal"}
                     className="w-full h-full overflow-hidden"
                 >
-                    {/* Draw.io Canvas */}
                     <ResizablePanel
                         id="drawio-panel"
                         defaultSize={isMobile ? 50 : 67}
                         minSize={20}
                     >
                         <div className="w-full h-full relative bg-white rounded-l-2xl overflow-hidden">
+                            {/* 工具栏 - 移入 Canvas 面板内，避免遮挡聊天面板 */}
+                            <div className="absolute top-5 right-5 z-20 flex items-center justify-between gap-8 pointer-events-none">
+                                {/* 右侧按钮组 - 恢复 pointer-events */}
+                                <div className="flex items-center gap-4 pointer-events-auto">
+                                    {/* 保存按钮组 */}
+                                    <div className="flex items-center gap-3">
+                                        <DiagramToolbar
+                                            diagramId={diagramId}
+                                            title={diagramTitle}
+                                            xml={chartXML}
+                                            onSave={handleSave}
+                                        />
+                                    </div>
+
+                                    {/* 分隔线 */}
+                                    <div className="h-8 w-px bg-gray-200"></div>
+
+                                    {/* 全屏按钮 */}
+                                    <button
+                                        onClick={toggleFullscreen}
+                                        className="p-3 rounded-xl bg-white/95 hover:bg-white text-gray-800 border border-gray-300 hover:border-gray-400 shadow-md transition-all duration-200 hover:scale-105"
+                                        title={
+                                            isFullscreen
+                                                ? "退出全屏 (ESC)"
+                                                : "全屏模式"
+                                        }
+                                    >
+                                        {isFullscreen ? (
+                                            <Minimize2 className="h-6 w-6" />
+                                        ) : (
+                                            <Maximize2 className="h-6 w-6" />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
                             {isLoaded ? (
                                 <DrawIoEmbed
                                     key={`${drawioUi}-${darkMode}`}
@@ -431,6 +430,7 @@ export default function DrawioHome() {
                                 onToggleVisibility={toggleChatPanel}
                                 darkMode={darkMode}
                                 diagramTitle={diagramTitle}
+                                spaceId={currentSpaceId}
                             />
                         </div>
                     </ResizablePanel>
