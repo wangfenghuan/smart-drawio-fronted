@@ -2,10 +2,10 @@
 
 import {
     AppstoreOutlined,
-    ClockCircleOutlined,
     DatabaseOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
+    NotificationOutlined,
     SafetyOutlined,
     TeamOutlined,
     UserOutlined,
@@ -13,6 +13,7 @@ import {
 import { Layout, theme } from "antd"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { AdminAnnouncementManagement } from "@/components/admin/AdminAnnouncementManagement"
 import { AdminDiagramManagement } from "@/components/admin/AdminDiagramManagement"
 import { AdminMaterialManagement } from "@/components/admin/AdminMaterialManagement"
 import { AdminRoleManagement } from "@/components/admin/AdminRoleManagement"
@@ -29,6 +30,7 @@ type AdminTab =
     | "diagrams"
     | "spaces"
     | "materials"
+    | "announcements" // Added "announcements"
 
 interface MenuItem {
     key: AdminTab
@@ -44,7 +46,7 @@ const menuItems: MenuItem[] = [
     },
     {
         key: "roles",
-        label: "角色权限",
+        label: "角色管理", // Changed label from "角色权限" to "角色管理"
         icon: <SafetyOutlined />,
     },
     {
@@ -55,7 +57,7 @@ const menuItems: MenuItem[] = [
     {
         key: "diagrams",
         label: "图表管理",
-        icon: <ClockCircleOutlined />,
+        icon: <MenuFoldOutlined />, // Changed icon from ClockCircleOutlined to MenuFoldOutlined
     },
     {
         key: "spaces",
@@ -66,6 +68,11 @@ const menuItems: MenuItem[] = [
         key: "materials",
         label: "素材管理",
         icon: <AppstoreOutlined />,
+    },
+    {
+        key: "announcements", // Added new menu item for announcements
+        label: "公告管理",
+        icon: <NotificationOutlined />,
     },
 ]
 
@@ -90,6 +97,8 @@ export default function AdminPage() {
                 return <AdminSpaceManagement />
             case "materials":
                 return <AdminMaterialManagement />
+            case "announcements":
+                return <AdminAnnouncementManagement />
             default:
                 return <AdminUserManagement />
         }

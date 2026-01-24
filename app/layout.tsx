@@ -7,6 +7,7 @@ import React, { useCallback, useEffect } from "react"
 import { Provider, useDispatch } from "react-redux"
 import AccessLayout from "@/access/AccessLayout"
 import { getLoginUser } from "@/api/userController"
+import { GlobalAnnouncementPopup } from "@/components/GlobalAnnouncementPopup"
 import { DiagramProvider } from "@/contexts/diagram-context"
 import BasicLayout from "@/layouts/basiclayout"
 import store, { type AppDispatch } from "@/stores"
@@ -25,8 +26,9 @@ const InitLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const doInitLoginUser = useCallback(async () => {
         try {
             const res = await getLoginUser()
-            if (res?.code === 0 && res?.data) {
-                // 登录成功，保存用户信息（修复：直接使用 res.data）
+            // @ts-expect-error
+            if (res.code === 0 && res.data) {
+                // 登录成功，保存用户信息
                 dispatch(setLoginUser(res.data))
             } else {
                 // 未登录或登录失效
@@ -101,6 +103,7 @@ export default function RootLayout({
                                                 {children}
                                             </DiagramProvider>
                                         </AccessLayout>
+                                        <GlobalAnnouncementPopup />
                                     </BasicLayout>
                                 </InitLayout>
                             </Provider>

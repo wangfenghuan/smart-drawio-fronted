@@ -1,4 +1,81 @@
 declare namespace API {
+    type Announcement = {
+        id?: string
+        userId?: string
+        title?: string
+        content?: string
+        createTime?: string
+        updateTime?: string
+        isDelete?: string
+        priority?: number
+    }
+
+    type AnnouncementAddRequest = {
+        /** 公告标题 */
+        title?: string
+        /** 公告内容 */
+        content?: string
+        /** 优先级（1优先级最高，0代表取消公告） */
+        priority?: number
+    }
+
+    type AnnouncementQueryRequest = {
+        current?: number
+        pageSize?: number
+        sortField?: string
+        sortOrder?: string
+        /** 公告ID */
+        id?: string
+        /** 公告标题 */
+        title?: string
+        /** 发布人ID */
+        userId?: string
+        /** 优先级（1优先级最高，0代表取消公告） */
+        priority?: number
+    }
+
+    type AnnouncementUpdateRequest = {
+        /** 公告ID */
+        id?: string
+        /** 公告标题 */
+        title?: string
+        /** 公告内容 */
+        content?: string
+        /** 优先级（1优先级最高，0代表取消公告） */
+        priority?: number
+    }
+
+    type AnnouncementVO = {
+        /** 公告ID */
+        id?: string
+        /** 公告标题 */
+        title?: string
+        /** 公告内容 */
+        content?: string
+        /** 优先级（1优先级最高，0代表取消公告） */
+        priority?: number
+        /** 发布用户ID */
+        userId?: string
+        /** 发布用户信息 */
+        userVO?: UserVO
+        /** 创建时间 */
+        createTime?: string
+        /** 更新时间 */
+        updateTime?: string
+    }
+
+    type BaseResponseAnnouncement = {
+        code?: number
+        data?: Announcement
+        message?: string
+    }
+
+    type BaseResponseAnnouncementVO = {
+        code?: number
+        data?: AnnouncementVO
+        message?: string
+    }
+
     type BaseResponseBoolean = {
         code?: number
         data?: boolean
@@ -56,6 +133,18 @@ declare namespace API {
     type BaseResponseMaterialVO = {
         code?: number
         data?: MaterialVO
+        message?: string
+    }
+
+    type BaseResponsePageAnnouncement = {
+        code?: number
+        data?: PageAnnouncement
+        message?: string
+    }
+
+    type BaseResponsePageAnnouncementVO = {
+        code?: number
+        data?: PageAnnouncementVO
         message?: string
     }
 
@@ -384,6 +473,14 @@ declare namespace API {
         diagramId: string
     }
 
+    type getAnnouncementByIdParams = {
+        id: number
+    }
+
+    type getAnnouncementVOByIdParams = {
+        id: number
+    }
+
     type getDiagramRoomVOByIdParams = {
         id: number
     }
@@ -538,6 +635,34 @@ declare namespace API {
     type OrderItem = {
         column?: string
         asc?: boolean
+    }
+
+    type PageAnnouncement = {
+        records?: Announcement[]
+        total?: number
+        size?: number
+        current?: number
+        orders?: OrderItem[]
+        optimizeCountSql?: any
+        searchCount?: any
+        optimizeJoinOfCountSql?: boolean
+        maxLimit?: string
+        countId?: string
+        pages?: number
+    }
+
+    type PageAnnouncementVO = {
+        records?: AnnouncementVO[]
+        total?: number
+        size?: number
+        current?: number
+        orders?: OrderItem[]
+        optimizeCountSql?: any
+        searchCount?: any
+        optimizeJoinOfCountSql?: boolean
+        maxLimit?: string
+        countId?: string
+        pages?: number
     }
 
     type PageConversion = {
@@ -1063,9 +1188,9 @@ declare namespace API {
         /** 是否删除（0未删除，1已删除） */
         isDelete?: number
         enabled?: boolean
-        authoritieList?: SysAuthority[]
         accountNonExpired?: boolean
         accountNonLocked?: boolean
+        authoritieList?: SysAuthority[]
         username?: string
         password?: string
         credentialsNonExpired?: boolean

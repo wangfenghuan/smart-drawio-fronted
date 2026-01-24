@@ -1,36 +1,50 @@
+import {
+    CrownOutlined,
+    HomeOutlined,
+    NotificationOutlined,
+    ShopOutlined,
+    TableOutlined,
+    UserOutlined,
+} from "@ant-design/icons"
 import type { MenuDataItem } from "@ant-design/pro-layout"
 
-const menus: MenuDataItem[] = [
+export const menus: MenuDataItem[] = [
     {
+        name: "首页",
         path: "/",
-        name: "主页",
+        icon: <HomeOutlined />,
     },
     {
-        path: "/diagram-marketplace",
-        name: "图表广场",
-    },
-    {
-        path: "/material-marketplace",
-        name: "素材广场",
-    },
-    {
-        path: "/my-spaces",
-        name: "我的空间",
-    },
-    {
-        path: "/my-diagrams",
         name: "我的图表",
+        path: "/my-diagrams",
+        icon: <TableOutlined />,
     },
     {
-        path: "/my-rooms",
-        name: "协作房间",
+        name: "素材市场",
+        path: "/material-marketplace",
+        icon: <ShopOutlined />,
+    },
+    {
+        name: "图表市场",
+        path: "/diagram-marketplace",
+        icon: <CrownOutlined />,
+    },
+    {
+        name: "我的空间",
+        path: "/my-spaces",
+        icon: <UserOutlined />,
+    },
+    {
+        name: "公告",
+        path: "/announcement",
+        icon: <NotificationOutlined />,
     },
     {
         path: "/admin",
         name: "管理员控制台",
         access: "admin",
     },
-] as MenuDataItem[]
+]
 
 export default menus
 

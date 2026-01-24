@@ -4,6 +4,7 @@
 // API 唯一标识：
 
 import * as aiClientController from "./aiClientController"
+import * as announcementController from "./announcementController"
 import * as conversionController from "./conversionController"
 import * as diagramController from "./diagramController"
 import * as fileController from "./fileController"
@@ -23,5 +24,6 @@ export default {
     fileController,
     diagramController,
     aiClientController,
+    announcementController,
     conversionController,
 }

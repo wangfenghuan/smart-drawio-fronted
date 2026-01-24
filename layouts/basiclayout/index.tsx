@@ -188,11 +188,24 @@ export default function BasicLayout({ children }: Props) {
                     </Link>
                 )}
                 menuDataRender={() => getAccessibleMenus(loginUser, menus)}
-                menuItemRender={(item, dom) => (
-                    <Link href={item.path || "/"} target={item.target}>
-                        {dom}
-                    </Link>
-                )}
+                menuItemRender={(item, dom) => {
+                    const isActive =
+                        item.path === "/"
+                            ? pathName === "/"
+                            : pathName?.startsWith(item.path || "")
+                    return (
+                        <Link
+                            href={item.path || "/"}
+                            target={item.target}
+                            style={{
+                                color: isActive ? "#1890ff" : "inherit",
+                                fontWeight: isActive ? "bold" : "normal",
+                            }}
+                        >
+                            {dom}
+                        </Link>
+                    )
+                }}
                 // 编辑页/管理员页不需要 Footer，普通页显示小 Footer
                 footerRender={() => (isFullPage ? null : <GlobalFooter />)}
                 // 编辑页/管理员页不需要顶部 Header，普通页显示
