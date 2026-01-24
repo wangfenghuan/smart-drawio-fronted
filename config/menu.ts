@@ -10,6 +10,10 @@ const menus: MenuDataItem[] = [
         name: "图表广场",
     },
     {
+        path: "/material-marketplace",
+        name: "素材广场",
+    },
+    {
         path: "/my-spaces",
         name: "我的空间",
     },

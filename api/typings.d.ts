@@ -43,7 +43,19 @@ declare namespace API {
 
     type BaseResponseLong = {
         code?: number
-        data?: number
+        data?: string
+        message?: string
+    }
+
+    type BaseResponseMaterial = {
+        code?: number
+        data?: Material
+        message?: string
+    }
+
+    type BaseResponseMaterialVO = {
+        code?: number
+        data?: MaterialVO
         message?: string
     }
 
@@ -68,6 +80,18 @@ declare namespace API {
     type BaseResponsePageDiagramVO = {
         code?: number
         data?: PageDiagramVO
+        message?: string
+    }
+
+    type BaseResponsePageMaterial = {
+        code?: number
+        data?: PageMaterial
+        message?: string
+    }
+
+    type BaseResponsePageMaterialVO = {
+        code?: number
+        data?: PageMaterialVO
         message?: string
     }
 
@@ -207,11 +231,11 @@ declare namespace API {
         /** 矢量图URL */
         svgUrl?: string
         /** SVG文件大小（字节） */
-        svgSize?: number
+        svgSize?: string
         /** PNG文件大小（字节） */
-        pngSize?: number
+        pngSize?: string
         /** 图片总大小（字节） */
-        picSize?: number
+        picSize?: string
         /** 创建时间 */
         createTime?: string
         /** 更新时间 */
@@ -361,32 +385,40 @@ declare namespace API {
     }
 
     type getDiagramRoomVOByIdParams = {
-        id: string
+        id: number
     }
 
     type getDiagramVOByIdParams = {
-        id: string
+        id: number
+    }
+
+    type getMaterialByIdParams = {
+        id: number
+    }
+
+    type getMaterialVOByIdParams = {
+        id: number
     }
 
     type getRoomDiagramVOParams = {
-        diagramId: string
-        roomId: string
+        diagramId: number
+        roomId: number
     }
 
     type getSpaceByIdParams = {
-        id: string
+        id: number
     }
 
     type getSpaceVOByIdParams = {
-        id: string
+        id: number
     }
 
     type getUserByIdParams = {
-        id: string
+        id: number
     }
 
     type getUserVOByIdParams = {
-        id: string
+        id: number
     }
 
     type GrantedAuthority = {
@@ -417,6 +449,92 @@ declare namespace API {
         authorities?: SysAuthority[]
     }
 
+    type Material = {
+        id?: string
+        userId?: string
+        name?: string
+        description?: string
+        tags?: string
+        diagramCode?: string
+        pictureUrl?: string
+        svgUrl?: string
+        createTime?: string
+        updateTime?: string
+        isDelete?: number
+    }
+
+    type MaterialAddRequest = {
+        /** 素材名称 */
+        name?: string
+        /** 素材描述 */
+        description?: string
+        /** 标签（JSON数组字符串） */
+        tags?: string
+        /** 图表代码 */
+        diagramCode?: string
+        /** PNG图片地址 */
+        pictureUrl?: string
+        /** SVG图片地址 */
+        svgUrl?: string
+    }
+
+    type MaterialQueryRequest = {
+        current?: number
+        pageSize?: number
+        sortField?: string
+        sortOrder?: string
+        /** 素材ID */
+        id?: string
+        /** 素材名称 */
+        name?: string
+        /** 标签（JSON数组字符串） */
+        tags?: string
+        /** 创作者ID */
+        userId?: string
+    }
+
+    type MaterialUpdateRequest = {
+        /** 素材ID */
+        id?: string
+        /** 素材名称 */
+        name?: string
+        /** 素材描述 */
+        description?: string
+        /** 标签（JSON数组字符串） */
+        tags?: string
+        /** 图表代码 */
+        diagramCode?: string
+        /** PNG图片地址 */
+        pictureUrl?: string
+        /** SVG图片地址 */
+        svgUrl?: string
+    }
+
+    type MaterialVO = {
+        /** 素材ID */
+        id?: string
+        /** 素材名称 */
+        name?: string
+        /** 素材描述 */
+        description?: string
+        /** 标签（JSON数组字符串） */
+        tags?: string
+        /** 图表代码 */
+        diagramCode?: string
+        /** PNG图片地址 */
+        pictureUrl?: string
+        /** SVG图片地址 */
+        svgUrl?: string
+        /** 创建用户ID */
+        userId?: string
+        /** 创建用户信息 */
+        userVO?: UserVO
+        /** 创建时间 */
+        createTime?: string
+        /** 更新时间 */
+        updateTime?: string
+    }
+
     type OrderItem = {
         column?: string
         asc?: boolean
@@ -431,7 +549,7 @@ declare namespace API {
         optimizeCountSql?: any
         searchCount?: any
         optimizeJoinOfCountSql?: boolean
-        maxLimit?: number
+        maxLimit?: string
         countId?: string
         pages?: number
     }
@@ -445,7 +563,7 @@ declare namespace API {
         optimizeCountSql?: any
         searchCount?: any
         optimizeJoinOfCountSql?: boolean
-        maxLimit?: number
+        maxLimit?: string
         countId?: string
         pages?: number
     }
@@ -459,7 +577,7 @@ declare namespace API {
         optimizeCountSql?: any
         searchCount?: any
         optimizeJoinOfCountSql?: boolean
-        maxLimit?: number
+        maxLimit?: string
         countId?: string
         pages?: number
     }
@@ -473,7 +591,35 @@ declare namespace API {
         optimizeCountSql?: any
         searchCount?: any
         optimizeJoinOfCountSql?: boolean
-        maxLimit?: number
+        maxLimit?: string
+        countId?: string
+        pages?: number
+    }
+
+    type PageMaterial = {
+        records?: Material[]
+        total?: number
+        size?: number
+        current?: number
+        orders?: OrderItem[]
+        optimizeCountSql?: any
+        searchCount?: any
+        optimizeJoinOfCountSql?: boolean
+        maxLimit?: string
+        countId?: string
+        pages?: number
+    }
+
+    type PageMaterialVO = {
+        records?: MaterialVO[]
+        total?: number
+        size?: number
+        current?: number
+        orders?: OrderItem[]
+        optimizeCountSql?: any
+        searchCount?: any
+        optimizeJoinOfCountSql?: boolean
+        maxLimit?: string
         countId?: string
         pages?: number
     }
@@ -487,7 +633,7 @@ declare namespace API {
         optimizeCountSql?: any
         searchCount?: any
         optimizeJoinOfCountSql?: boolean
-        maxLimit?: number
+        maxLimit?: string
         countId?: string
         pages?: number
     }
@@ -501,7 +647,7 @@ declare namespace API {
         optimizeCountSql?: any
         searchCount?: any
         optimizeJoinOfCountSql?: boolean
-        maxLimit?: number
+        maxLimit?: string
         countId?: string
         pages?: number
     }
@@ -515,7 +661,7 @@ declare namespace API {
         optimizeCountSql?: any
         searchCount?: any
         optimizeJoinOfCountSql?: boolean
-        maxLimit?: number
+        maxLimit?: string
         countId?: string
         pages?: number
     }
@@ -529,7 +675,7 @@ declare namespace API {
         optimizeCountSql?: any
         searchCount?: any
         optimizeJoinOfCountSql?: boolean
-        maxLimit?: number
+        maxLimit?: string
         countId?: string
         pages?: number
     }
@@ -543,16 +689,16 @@ declare namespace API {
         optimizeCountSql?: any
         searchCount?: any
         optimizeJoinOfCountSql?: boolean
-        maxLimit?: number
+        maxLimit?: string
         countId?: string
         pages?: number
     }
 
     type RoleAuthorityUpdateRequest = {
         /** 角色ID */
-        roleId: number
+        roleId: string
         /** 权限ID列表 */
-        authorityIds: number[]
+        authorityIds: string[]
     }
 
     type RoleWithAuthoritiesVO = {
@@ -737,10 +883,10 @@ declare namespace API {
         id?: string
         spaceName?: string
         spaceLevel?: number
-        maxSize?: number
-        maxCount?: number
-        totalSize?: number
-        totalCount?: number
+        maxSize?: string
+        maxCount?: string
+        totalSize?: string
+        totalCount?: string
         spaceType?: number
         userId?: string
         createTime?: string
@@ -788,10 +934,10 @@ declare namespace API {
         id?: string
         spaceName?: string
         spaceLevel?: number
-        maxSize?: number
-        maxCount?: number
-        totalSize?: number
-        totalCount?: number
+        maxSize?: string
+        maxCount?: string
+        totalSize?: string
+        totalCount?: string
     }
 
     type SpaceUser = {
@@ -850,10 +996,10 @@ declare namespace API {
         spaceName?: string
         spaceType?: number
         spaceLevel?: number
-        maxSize?: number
-        maxCount?: number
-        totalSize?: number
-        totalCount?: number
+        maxSize?: string
+        maxCount?: string
+        totalSize?: string
+        totalCount?: string
         userId?: string
         createTime?: string
         editTime?: string
@@ -862,7 +1008,7 @@ declare namespace API {
     }
 
     type SseEmitter = {
-        timeout?: number
+        timeout?: string
     }
 
     type SysAuthority = {
@@ -977,7 +1123,7 @@ declare namespace API {
         /** 用户ID */
         userId: string
         /** 角色ID列表 */
-        roleIds: number[]
+        roleIds: string[]
     }
 
     type UserUpdateMyRequest = {

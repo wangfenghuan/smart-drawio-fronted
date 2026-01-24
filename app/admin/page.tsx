@@ -1,6 +1,7 @@
 "use client"
 
 import {
+    AppstoreOutlined,
     ClockCircleOutlined,
     DatabaseOutlined,
     MenuFoldOutlined,
@@ -13,6 +14,7 @@ import { Layout, theme } from "antd"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { AdminDiagramManagement } from "@/components/admin/AdminDiagramManagement"
+import { AdminMaterialManagement } from "@/components/admin/AdminMaterialManagement"
 import { AdminRoleManagement } from "@/components/admin/AdminRoleManagement"
 import { AdminRoomManagement } from "@/components/admin/AdminRoomManagement"
 import { AdminSpaceManagement } from "@/components/admin/AdminSpaceManagement"
@@ -20,7 +22,13 @@ import { AdminUserManagement } from "@/components/admin/AdminUserManagement"
 
 const { Sider, Content, Header } = Layout
 
-type AdminTab = "users" | "roles" | "rooms" | "diagrams" | "spaces"
+type AdminTab =
+    | "users"
+    | "roles"
+    | "rooms"
+    | "diagrams"
+    | "spaces"
+    | "materials"
 
 interface MenuItem {
     key: AdminTab
@@ -54,6 +62,11 @@ const menuItems: MenuItem[] = [
         label: "空间管理",
         icon: <DatabaseOutlined />,
     },
+    {
+        key: "materials",
+        label: "素材管理",
+        icon: <AppstoreOutlined />,
+    },
 ]
 
 export default function AdminPage() {
@@ -75,6 +88,8 @@ export default function AdminPage() {
                 return <AdminDiagramManagement />
             case "spaces":
                 return <AdminSpaceManagement />
+            case "materials":
+                return <AdminMaterialManagement />
             default:
                 return <AdminUserManagement />
         }

@@ -7,6 +7,7 @@ import * as aiClientController from "./aiClientController"
 import * as conversionController from "./conversionController"
 import * as diagramController from "./diagramController"
 import * as fileController from "./fileController"
+import * as materialController from "./materialController"
 import * as roomController from "./roomController"
 import * as roomMemberController from "./roomMemberController"
 import * as spaceController from "./spaceController"
@@ -18,6 +19,7 @@ export default {
     spaceController,
     roomMemberController,
     roomController,
+    materialController,
     fileController,
     diagramController,
     aiClientController,
