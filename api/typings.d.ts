@@ -88,6 +88,18 @@ declare namespace API {
         message?: string
     }
 
+    type BaseResponseFeedback = {
+        code?: number
+        data?: Feedback
+        message?: string
+    }
+
+    type BaseResponseFeedbackVO = {
+        code?: number
+        data?: FeedbackVO
+        message?: string
+    }
+
     type BaseResponseListRoleWithAuthoritiesVO = {
         code?: number
         data?: RoleWithAuthoritiesVO[]
@@ -169,6 +181,18 @@ declare namespace API {
     type BaseResponsePageDiagramVO = {
         code?: number
         data?: PageDiagramVO
+        message?: string
+    }
+
+    type BaseResponsePageFeedback = {
+        code?: number
+        data?: PageFeedback
+        message?: string
+    }
+
+    type BaseResponsePageFeedbackVO = {
+        code?: number
+        data?: PageFeedbackVO
         message?: string
     }
 
@@ -473,6 +497,53 @@ declare namespace API {
         diagramId: string
     }
 
+    type Feedback = {
+        id?: string
+        userId?: string
+        content?: string
+        pictureUrl?: string
+        createTime?: string
+        updateTime?: string
+        isDelete?: number
+    }
+
+    type FeedbackAddRequest = {
+        /** 反馈内容 */
+        content?: string
+        /** 反馈图片URL */
+        pictureUrl?: string
+    }
+
+    type FeedbackQueryRequest = {
+        current?: number
+        pageSize?: number
+        sortField?: string
+        sortOrder?: string
+        /** 反馈ID */
+        id?: string
+        /** 用户ID */
+        userId?: string
+        /** 反馈内容（模糊搜索） */
+        content?: string
+    }
+
+    type FeedbackVO = {
+        /** 反馈ID */
+        id?: string
+        /** 反馈内容 */
+        content?: string
+        /** 反馈图片URL */
+        pictureUrl?: string
+        /** 反馈用户ID */
+        userId?: string
+        /** 反馈用户信息 */
+        userVO?: UserVO
+        /** 创建时间 */
+        createTime?: string
+        /** 更新时间 */
+        updateTime?: string
+    }
+
     type getAnnouncementByIdParams = {
         id: number
     }
@@ -486,6 +557,14 @@ declare namespace API {
     }
 
     type getDiagramVOByIdParams = {
+        id: number
+    }
+
+    type getFeedbackByIdParams = {
+        id: number
+    }
+
+    type getFeedbackVOByIdParams = {
         id: number
     }
 
@@ -709,6 +788,34 @@ declare namespace API {
 
     type PageDiagramVO = {
         records?: DiagramVO[]
+        total?: number
+        size?: number
+        current?: number
+        orders?: OrderItem[]
+        optimizeCountSql?: any
+        searchCount?: any
+        optimizeJoinOfCountSql?: boolean
+        maxLimit?: string
+        countId?: string
+        pages?: number
+    }
+
+    type PageFeedback = {
+        records?: Feedback[]
+        total?: number
+        size?: number
+        current?: number
+        orders?: OrderItem[]
+        optimizeCountSql?: any
+        searchCount?: any
+        optimizeJoinOfCountSql?: boolean
+        maxLimit?: string
+        countId?: string
+        pages?: number
+    }
+
+    type PageFeedbackVO = {
+        records?: FeedbackVO[]
         total?: number
         size?: number
         current?: number
@@ -1075,10 +1182,10 @@ declare namespace API {
         updateTime?: string
         isDelete?: number
         enabled?: boolean
-        accountNonExpired?: boolean
-        accountNonLocked?: boolean
         username?: string
         password?: string
+        accountNonExpired?: boolean
+        accountNonLocked?: boolean
         credentialsNonExpired?: boolean
     }
 
@@ -1188,11 +1295,11 @@ declare namespace API {
         /** 是否删除（0未删除，1已删除） */
         isDelete?: number
         enabled?: boolean
-        accountNonExpired?: boolean
-        accountNonLocked?: boolean
-        authoritieList?: SysAuthority[]
         username?: string
         password?: string
+        authoritieList?: SysAuthority[]
+        accountNonExpired?: boolean
+        accountNonLocked?: boolean
         credentialsNonExpired?: boolean
     }
 

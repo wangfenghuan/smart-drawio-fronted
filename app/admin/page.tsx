@@ -7,6 +7,7 @@ import {
     MenuUnfoldOutlined,
     NotificationOutlined,
     SafetyOutlined,
+    SolutionOutlined,
     TeamOutlined,
     UserOutlined,
 } from "@ant-design/icons"
@@ -15,6 +16,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { AdminAnnouncementManagement } from "@/components/admin/AdminAnnouncementManagement"
 import { AdminDiagramManagement } from "@/components/admin/AdminDiagramManagement"
+import { AdminFeedbackManagement } from "@/components/admin/AdminFeedbackManagement"
 import { AdminMaterialManagement } from "@/components/admin/AdminMaterialManagement"
 import { AdminRoleManagement } from "@/components/admin/AdminRoleManagement"
 import { AdminRoomManagement } from "@/components/admin/AdminRoomManagement"
@@ -30,7 +32,8 @@ type AdminTab =
     | "diagrams"
     | "spaces"
     | "materials"
-    | "announcements" // Added "announcements"
+    | "announcements"
+    | "feedback"
 
 interface MenuItem {
     key: AdminTab
@@ -70,9 +73,14 @@ const menuItems: MenuItem[] = [
         icon: <AppstoreOutlined />,
     },
     {
-        key: "announcements", // Added new menu item for announcements
+        key: "announcements",
         label: "公告管理",
         icon: <NotificationOutlined />,
+    },
+    {
+        key: "feedback",
+        label: "反馈管理",
+        icon: <SolutionOutlined />,
     },
 ]
 
@@ -99,6 +107,8 @@ export default function AdminPage() {
                 return <AdminMaterialManagement />
             case "announcements":
                 return <AdminAnnouncementManagement />
+            case "feedback":
+                return <AdminFeedbackManagement />
             default:
                 return <AdminUserManagement />
         }

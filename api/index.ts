@@ -7,6 +7,7 @@ import * as aiClientController from "./aiClientController"
 import * as announcementController from "./announcementController"
 import * as conversionController from "./conversionController"
 import * as diagramController from "./diagramController"
+import * as feedBackController from "./feedBackController"
 import * as fileController from "./fileController"
 import * as materialController from "./materialController"
 import * as roomController from "./roomController"
@@ -22,6 +23,7 @@ export default {
     roomController,
     materialController,
     fileController,
+    feedBackController,
     diagramController,
     aiClientController,
     announcementController,

@@ -1,6 +1,7 @@
 import {
     CrownOutlined,
     HomeOutlined,
+    MessageOutlined,
     NotificationOutlined,
     ShopOutlined,
     TableOutlined,
@@ -38,6 +39,11 @@ export const menus: MenuDataItem[] = [
         name: "公告",
         path: "/announcement",
         icon: <NotificationOutlined />,
+    },
+    {
+        name: "意见反馈",
+        path: "/user/feedback",
+        icon: <MessageOutlined />,
     },
     {
         path: "/admin",
