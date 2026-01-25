@@ -158,7 +158,6 @@ export default function UserProfilePage() {
         try {
             const formData = new FormData()
             formData.append("file", file)
-            // @ts-expect-error
             const res = await uploadAvataImage(formData)
             if (res.code === 0 && res.data) {
                 form.setFieldValue("userAvatar", res.data)

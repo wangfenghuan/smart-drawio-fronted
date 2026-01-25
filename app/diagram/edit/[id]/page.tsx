@@ -53,7 +53,7 @@ export default function DrawioHome() {
     const [closeProtection, setCloseProtection] = useState(false)
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [diagramTitle, setDiagramTitle] = useState(`图表_${diagramId}`)
-    const [currentSpaceId, setCurrentSpaceId] = useState<number | undefined>(
+    const [currentSpaceId, setCurrentSpaceId] = useState<string | undefined>(
         undefined,
     ) // 当前图表所属的空间ID
     const [diagramInfo, setDiagramInfo] = useState<API.DiagramVO | null>(null)
@@ -115,19 +115,21 @@ export default function DrawioHome() {
                     )
                     console.log("当前状态:", {
                         isDrawioReady,
-                        hasRef: !!drawioRef.current,
+                        // @ts-expect-error
+                        hasRef: !!drawioRef?.current,
                     })
 
                     // 简化逻辑：只要 ref 存在就直接加载，不等待 isDrawioReady
                     // 因为 ref 存在说明 DrawIo 组件已经渲染完成
-                    if (!drawioRef.current) {
+                    if (!drawioRef?.current) {
                         console.warn(
                             "⚠️ DrawIo ref 不存在，等待 500ms 后重试...",
                         )
                         // 如果 ref 不存在，等待一小段时间
                         await new Promise((resolve) => setTimeout(resolve, 500))
 
-                        if (!drawioRef.current) {
+                        // @ts-expect-error
+                        if (!drawioRef?.current) {
                             console.error("❌ DrawIo ref 仍然不存在，跳过加载")
                             toast.error("DrawIo 未就绪，请刷新页面重试")
                             return
@@ -139,7 +141,8 @@ export default function DrawioHome() {
                     console.log("[3/3] 正在渲染图表到画布...")
                     console.log(
                         "调用 loadDiagram 前，ref 状态:",
-                        !!drawioRef.current,
+                        // @ts-expect-error
+                        !!drawioRef?.current,
                     )
 
                     const error = loadDiagram(diagramCode)

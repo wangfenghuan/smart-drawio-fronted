@@ -27,15 +27,10 @@ export default function AnnouncementPage() {
                 sortField: "createTime",
                 sortOrder: "descend",
             })
-            // @ts-expect-error
             if (res.code === 0 && res.data) {
-                // @ts-expect-error
                 setData(res.data.records || [])
-                // @ts-expect-error
                 setTotal(res.data.total || 0)
-                // @ts-expect-error
                 setCurrent(res.data.current || 1)
-                // @ts-expect-error
                 setPageSize(res.data.size || 10)
             }
         } catch (error) {

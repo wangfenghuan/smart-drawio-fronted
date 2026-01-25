@@ -29,9 +29,7 @@ export const GlobalAnnouncementPopup = () => {
                     sortOrder: "descend",
                 })
 
-                // @ts-expect-error
                 if (res.code === 0 && res.data?.records?.length > 0) {
-                    // @ts-expect-error
                     const topAnnouncement = res.data.records[0]
 
                     // Check if it's a high priority announcement (priority > 0)

@@ -1,4 +1,4 @@
-import axios from "axios"
+import axios, { type AxiosInstance, type AxiosRequestConfig } from "axios"
 
 // 创建 Axios 实例
 const myAxios = axios.create({
@@ -80,4 +80,9 @@ myAxios.interceptors.response.use(
     },
 )
 
-export default myAxios
+interface CustomAxiosInstance extends AxiosInstance {
+    <T = any>(config: AxiosRequestConfig): Promise<T>
+    <T = any>(url: string, config?: AxiosRequestConfig): Promise<T>
+}
+
+export default myAxios as unknown as CustomAxiosInstance

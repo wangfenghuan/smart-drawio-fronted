@@ -17,7 +17,6 @@ import { useSelector } from "react-redux"
 import remarkGfm from "remark-gfm"
 import { toast } from "sonner"
 import { listDiagramChatHistory } from "@/api/conversionController"
-import type { API } from "@/api/typings"
 import { AIConfigDialog, useAIConfig } from "@/components/ai-config-dialog"
 import { CodeBlock } from "@/components/code-block"
 import { CollaborationPanel } from "@/components/collaboration-panel"
@@ -41,7 +40,7 @@ interface SimpleChatPanelProps {
     onToggleVisibility: () => void
     darkMode: boolean
     diagramTitle: string
-    spaceId?: number
+    spaceId?: number | string
 }
 
 export default function SimpleChatPanel({
@@ -260,7 +259,7 @@ export default function SimpleChatPanel({
                     diagramId: diagramId,
                     userId: loginUser.id,
                     title: diagramTitle,
-                    xml: latestXML, // ✅ 使用最新导出的 XML
+                    xml: latestXML || "", // ✅ 使用最新导出的 XML
                 }),
                 timeoutPromise,
             ])

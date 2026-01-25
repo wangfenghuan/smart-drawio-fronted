@@ -144,16 +144,11 @@ export const AdminAnnouncementManagement = () => {
                 sortField: "priority",
                 sortOrder: "descend",
             })
-            // @ts-expect-error
             if (res.code === 0 && res.data) {
-                // @ts-expect-error
                 setAnnouncements(res.data.records || [])
                 setPagination({
-                    // @ts-expect-error
                     current: res.data.current || 1,
-                    // @ts-expect-error
                     pageSize: res.data.size || 10,
-                    // @ts-expect-error
                     total: res.data.total || 0,
                 })
             } else {
@@ -178,12 +173,10 @@ export const AdminAnnouncementManagement = () => {
     const handleDelete = async (id: string) => {
         try {
             const res = await deleteAnnouncement({ id })
-            // @ts-expect-error
             if (res.code === 0) {
                 message.success("删除成功")
                 loadData()
             } else {
-                // @ts-expect-error
                 message.error("删除失败：" + res.message)
             }
         } catch (_error) {
@@ -214,7 +207,6 @@ export const AdminAnnouncementManagement = () => {
                 res = await addAnnouncement(values)
             }
 
-            // @ts-expect-error
             if (res.code === 0) {
                 message.success(editingAnnouncement ? "更新成功" : "创建成功")
                 setModalVisible(false)
@@ -223,7 +215,6 @@ export const AdminAnnouncementManagement = () => {
                 message.error(
                     (editingAnnouncement ? "更新" : "创建") +
                         "失败：" +
-                        // @ts-expect-error
                         res.message,
                 )
             }

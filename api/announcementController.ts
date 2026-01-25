@@ -1,4 +1,3 @@
-// @ts-expect-error
 /* eslint-disable */
 import request from "@/lib/request"
 

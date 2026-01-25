@@ -22,7 +22,7 @@ import { addRoom } from "@/api/roomController"
 import { Button } from "@/components/ui/button"
 import { useDiagram } from "@/contexts/diagram-context"
 
-export function CollaborationPanel({ spaceId }: { spaceId?: number }) {
+export function CollaborationPanel({ spaceId }: { spaceId?: number | string }) {
     const { id: diagramId } = useParams()
     const router = useRouter()
     const {

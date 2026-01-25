@@ -553,56 +553,56 @@ declare namespace API {
     }
 
     type getAnnouncementByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getAnnouncementVOByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getDiagramRoomVOByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getDiagramVOByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getFeedbackByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getFeedbackVOByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getMaterialByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getMaterialVOByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getRoomDiagramVOParams = {
-        diagramId: number
-        roomId: number
+        diagramId: number | string
+        roomId: number | string
     }
 
     type getSpaceByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getSpaceVOByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getUserByIdParams = {
-        id: number
+        id: number | string
     }
 
     type getUserVOByIdParams = {
-        id: number
+        id: number | string
     }
 
     type GrantedAuthority = {
@@ -611,7 +611,7 @@ declare namespace API {
 
     type listDiagramChatHistoryParams = {
         diagramId: string
-        pageSize?: number
+        pageSize?: number | string
         lasteCreateTime?: string
     }
 

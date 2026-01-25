@@ -35,7 +35,6 @@ const InitLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         try {
             const res = await getLoginUser()
-            // @ts-expect-error
             if (res.code === 0 && res.data) {
                 // 登录成功，保存用户信息
                 dispatch(setLoginUser(res.data))
