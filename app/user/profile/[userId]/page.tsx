@@ -152,10 +152,10 @@ export default function UserProfilePage() {
             {/* 顶部背景图区域 */}
             <div
                 style={{
-                    height: "240px",
+                    height: "300px",
                     background:
-                        "linear-gradient(135deg, #1890ff 0%, #36cfc9 100%)",
-                    marginBottom: "-80px", // 让卡片上移覆盖一部分背景
+                        "linear-gradient(to bottom, #40a9ff 0%, #f0f2f5 100%)",
+                    marginBottom: "-100px",
                 }}
             />
 
@@ -196,10 +196,14 @@ export default function UserProfilePage() {
                                         style={{
                                             border: "4px solid #fff",
                                             boxShadow:
-                                                "0 2px 8px rgba(0,0,0,0.15)",
-                                            backgroundColor: "#f56a00", // fallback color
+                                                "0 2px 8px rgba(0,0,0,0.08)",
+                                            backgroundColor: "#f5f5f5", // cleaner fallback
                                         }}
-                                        icon={<UserOutlined />}
+                                        icon={
+                                            <UserOutlined
+                                                style={{ color: "#bfbfbf" }}
+                                            />
+                                        }
                                     />
                                     <div style={{ paddingTop: "12px" }}>
                                         <div

@@ -602,7 +602,7 @@ declare namespace API {
     }
 
     type getUserVOByIdParams = {
-        id: number
+        id: number | string
     }
 
     type GrantedAuthority = {
@@ -1402,5 +1402,9 @@ declare namespace API {
         authorities?: SysAuthority[]
         /** 创建时间 */
         createTime?: string
+        /** 更新时间 */
+        updateTime?: string
+        /** 用户账号 */
+        userAccount?: string
     }
 }
