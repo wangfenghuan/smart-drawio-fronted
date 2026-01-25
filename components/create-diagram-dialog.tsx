@@ -12,12 +12,16 @@ interface CreateDiagramDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     onSuccess?: (diagramId: string | number) => void
+    initialName?: string
+    initialDiagramCode?: string
 }
 
 export function CreateDiagramDialog({
     open,
     onOpenChange,
     onSuccess,
+    initialName,
+    initialDiagramCode,
 }: CreateDiagramDialogProps) {
     const { message } = App.useApp()
     const [form] = Form.useForm()
@@ -31,22 +35,28 @@ export function CreateDiagramDialog({
         if (open) {
             loadSpaces()
             loadSpaceLevels()
+            loadSpaceLevels()
             form.resetFields()
             // 默认不选择空间（公共图库）
             form.setFieldValue("spaceId", "none")
+            // Apply initial name if provided
+            if (initialName) {
+                form.setFieldValue("name", initialName)
+            }
         }
-    }, [open, form])
+    }, [open, form, initialName])
 
     const loadSpaces = async () => {
         setSpacesLoading(true)
         try {
             console.log("[创建图表] 开始获取空间列表...")
-            const response = await listMySpaceVoByPage({
+            // Fix: Cast response to match runtime behavior
+            const response = (await listMySpaceVoByPage({
                 current: 1,
                 pageSize: 20, // 每页最多20条（接口限制）
                 sortField: "createTime",
                 sortOrder: "desc",
-            })
+            })) as unknown as API.BaseResponsePageSpaceVO
 
             console.log("[创建图表] 空间列表响应:", response)
 
@@ -68,7 +78,8 @@ export function CreateDiagramDialog({
     const loadSpaceLevels = async () => {
         setSpaceLevelsLoading(true)
         try {
-            const response = await listSpaceLevel()
+            const response =
+                (await listSpaceLevel()) as unknown as API.BaseResponseListSpaceLevel
             if (response?.code === 0 && response?.data) {
                 setSpaceLevels(response.data)
             }
@@ -89,12 +100,12 @@ export function CreateDiagramDialog({
             const values = await form.validateFields()
             setLoading(true)
 
-            const response = await addDiagram({
+            const response = (await addDiagram({
                 name: values.name || "未命名图表",
-                diagramCode: "",
+                diagramCode: initialDiagramCode || "",
                 pictureUrl: "",
                 spaceId: values.spaceId === "none" ? undefined : values.spaceId,
-            })
+            })) as unknown as API.BaseResponseLong
 
             if (response?.code === 0 && response.data) {
                 message.success("图表创建成功！")

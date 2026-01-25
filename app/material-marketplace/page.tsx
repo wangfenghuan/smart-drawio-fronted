@@ -2,18 +2,22 @@
 
 import {
     AppstoreOutlined,
+    RocketOutlined,
     SearchOutlined,
     UserOutlined,
 } from "@ant-design/icons"
 import { App, Button, Card, Empty, Input, Modal, Pagination, Tag } from "antd"
+import { useRouter } from "next/navigation" // Correct import for Next.js 13+ app dir
 import { useEffect, useRef, useState } from "react"
 import { listMaterialVoByPage } from "@/api/materialController"
+import { CreateDiagramDialog } from "@/components/create-diagram-dialog"
 import MaterialViewer from "@/components/MaterialViewer"
 
 const { Search } = Input
 
 export default function MaterialMarketplacePage() {
     const { message } = App.useApp()
+    const router = useRouter()
 
     const [materials, setMaterials] = useState<API.MaterialVO[]>([])
     const [loading, setLoading] = useState(false)
@@ -28,6 +32,10 @@ export default function MaterialMarketplacePage() {
     const [previewMaterial, setPreviewMaterial] =
         useState<API.MaterialVO | null>(null)
 
+    // Create Diagram State
+    const [createDialogVisible, setCreateDialogVisible] = useState(false)
+    const [useMaterial, setUseMaterial] = useState<API.MaterialVO | null>(null)
+
     const isLoadingRef = useRef(false)
 
     // Load materials
@@ -41,13 +49,14 @@ export default function MaterialMarketplacePage() {
 
         try {
             // Using listMaterialVoByPage API
-            const response = await listMaterialVoByPage({
+            // Fix: Cast response to match runtime behavior
+            const response = (await listMaterialVoByPage({
                 current,
                 pageSize,
                 name: searchText,
                 sortField: "createTime",
                 sortOrder: "desc",
-            })
+            })) as unknown as API.BaseResponsePageMaterialVO
 
             if (response?.code === 0 && response?.data) {
                 const data = response.data
@@ -102,13 +111,13 @@ export default function MaterialMarketplacePage() {
         isLoadingRef.current = true
         setLoading(true)
         try {
-            const response = await listMaterialVoByPage({
+            const response = (await listMaterialVoByPage({
                 current,
                 pageSize,
                 name: search,
                 sortField: "createTime",
                 sortOrder: "desc",
-            })
+            })) as unknown as API.BaseResponsePageMaterialVO
             if (response?.code === 0 && response?.data) {
                 const data = response.data
                 setMaterials(data.records || [])
@@ -134,6 +143,15 @@ export default function MaterialMarketplacePage() {
     const handlePreview = (material: API.MaterialVO) => {
         setPreviewMaterial(material)
         setPreviewVisible(true)
+    }
+
+    const handleUseMaterial = (material: API.MaterialVO) => {
+        setUseMaterial(material)
+        setCreateDialogVisible(true)
+    }
+
+    const handleCreateSuccess = (diagramId: string | number) => {
+        router.push(`/diagram/edit/${diagramId}`)
     }
 
     return (
@@ -476,7 +494,27 @@ export default function MaterialMarketplacePage() {
                 }
                 open={previewVisible}
                 onCancel={() => setPreviewVisible(false)}
-                footer={null}
+                footer={[
+                    <Button
+                        key="cancel"
+                        onClick={() => setPreviewVisible(false)}
+                    >
+                        关闭
+                    </Button>,
+                    <Button
+                        key="use"
+                        type="primary"
+                        icon={<RocketOutlined />}
+                        onClick={() => {
+                            if (previewMaterial) {
+                                setPreviewVisible(false)
+                                handleUseMaterial(previewMaterial)
+                            }
+                        }}
+                    >
+                        开始使用
+                    </Button>,
+                ]}
                 width={1000}
                 centered
                 destroyOnClose
@@ -577,6 +615,18 @@ export default function MaterialMarketplacePage() {
                     )}
                 </div>
             </Modal>
+
+            <CreateDiagramDialog
+                open={createDialogVisible}
+                onOpenChange={setCreateDialogVisible}
+                onSuccess={handleCreateSuccess}
+                initialName={
+                    useMaterial?.name
+                        ? `使用素材-${useMaterial.name}`
+                        : undefined
+                }
+                initialDiagramCode={useMaterial?.diagramCode || undefined}
+            />
         </div>
     )
 }

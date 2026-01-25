@@ -17,6 +17,21 @@ export async function addFeedback(
     })
 }
 
+/** 此处后端没有提供注释 POST /feedback/delete */
+export async function deleteFeedback(
+    body: API.DeleteRequest,
+    options?: { [key: string]: any },
+) {
+    return request<API.BaseResponseBoolean>("/feedback/delete", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        data: body,
+        ...(options || {}),
+    })
+}
+
 /** 根据 id 获取反馈 GET /feedback/get */
 export async function getFeedbackById(
     // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
@@ -93,6 +108,21 @@ export async function listMyFeedbackVoByPage(
             ...(options || {}),
         },
     )
+}
+
+/** 此处后端没有提供注释 POST /feedback/update */
+export async function updateFeedback(
+    body: API.FeedbackUpdateRequest,
+    options?: { [key: string]: any },
+) {
+    return request<API.BaseResponseBoolean>("/feedback/update", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        data: body,
+        ...(options || {}),
+    })
 }
 
 /** 上传反馈图片 POST /feedback/upload/image */

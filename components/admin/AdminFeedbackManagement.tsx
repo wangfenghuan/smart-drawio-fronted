@@ -1,9 +1,23 @@
 "use client"
 
 import { SearchOutlined, SolutionOutlined } from "@ant-design/icons"
-import { App, Button, Card, Image, Input, Pagination, Table, Tag } from "antd"
+import {
+    App,
+    Button,
+    Card,
+    Image,
+    Input,
+    Pagination,
+    Popconfirm,
+    Table,
+    Tag,
+} from "antd"
 import { useEffect, useRef, useState } from "react"
-import { listFeedbackVoByPage } from "@/api/feedBackController"
+import {
+    deleteFeedback,
+    listFeedbackVoByPage,
+    updateFeedback,
+} from "@/api/feedBackController"
 
 const { Search } = Input
 
@@ -100,6 +114,46 @@ export function AdminFeedbackManagement() {
         loadData(page, pageSize)
     }
 
+    const handleUpdateStatus = async (record: API.FeedbackVO) => {
+        try {
+            // Fix: API definition thinks isHandle is string, but backend handles 0/1. Cast to number.
+            const currentStatus = Number(record.isHandle)
+            const newStatus = currentStatus === 1 ? 0 : 1
+            const res = (await updateFeedback({
+                id: record.id,
+                isHandle: newStatus,
+            })) as unknown as API.BaseResponseBoolean
+
+            if (res.data) {
+                message.success("更新状态成功")
+                // Refresh list
+                isLoadingRef.current = false
+                loadData()
+            } else {
+                message.error("更新状态失败：" + res.message)
+            }
+        } catch (error) {
+            message.error("操作失败，请重试")
+        }
+    }
+
+    const handleDelete = async (id: string) => {
+        try {
+            const res = (await deleteFeedback({
+                id,
+            })) as unknown as API.BaseResponseBoolean
+            if (res.data) {
+                message.success("删除成功")
+                // Refresh list
+                loadData()
+            } else {
+                message.error("删除失败：" + res.message)
+            }
+        } catch (error) {
+            message.error("删除失败，请重试")
+        }
+    }
+
     const columns = [
         {
             title: "反馈ID",
@@ -166,6 +220,48 @@ export function AdminFeedbackManagement() {
             width: 180,
             render: (time: string) =>
                 time ? new Date(time).toLocaleString() : "-",
+        },
+        {
+            title: "状态",
+            dataIndex: "isHandle",
+            key: "isHandle",
+            width: 100,
+            render: (isHandle: string | number) => {
+                const status = Number(isHandle)
+                return (
+                    <Tag color={status === 1 ? "green" : "orange"}>
+                        {status === 1 ? "已处理" : "未处理"}
+                    </Tag>
+                )
+            },
+        },
+        {
+            title: "操作",
+            key: "action",
+            width: 120,
+            render: (_: any, record: API.FeedbackVO) => (
+                <div style={{ display: "flex", gap: "8px" }}>
+                    <Button
+                        type="link"
+                        size="small"
+                        onClick={() => handleUpdateStatus(record)}
+                    >
+                        {Number(record.isHandle) === 1
+                            ? "标记未处理"
+                            : "标记已处理"}
+                    </Button>
+                    <Popconfirm
+                        title="确定要删除这条反馈吗？"
+                        onConfirm={() => handleDelete(record.id as string)}
+                        okText="确定"
+                        cancelText="取消"
+                    >
+                        <Button type="link" size="small" danger>
+                            删除
+                        </Button>
+                    </Popconfirm>
+                </div>
+            ),
         },
     ]
 
