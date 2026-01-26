@@ -251,19 +251,6 @@ export default function ChatPanel({
     )
     const LOCAL_STORAGE_DEBOUNCE_MS = 1000 // Save at most once per second
 
-    // Determine API URL based on environment and browser location
-    const getApiUrl = useCallback(() => {
-        // Force localhost if running continuously locally
-        if (
-            typeof window !== "undefined" &&
-            window.location.hostname === "localhost"
-        ) {
-            return "http://localhost:8081/api/chat/stream"
-        }
-        // Fallback to env var or remote
-        return `${BACKEND_API_URL}/chat/stream`
-    }, [])
-
     const {
         messages,
         sendMessage,
@@ -274,7 +261,7 @@ export default function ChatPanel({
         setMessages,
     } = useChat({
         transport: new DefaultChatTransport({
-            api: getApiUrl(),
+            api: `${BACKEND_API_URL}/chat/stream`,
         }),
         async onToolCall({ toolCall }) {
             if (DEBUG) {
