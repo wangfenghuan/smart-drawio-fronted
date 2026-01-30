@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react"
 
-// 强制指向本地 localhost:8081
-const API_BASE_URL = "http://localhost:8081/api"
+// 强制指向线上 47.95.35.178
+const API_BASE_URL = "http://47.95.35.178:8081/api"
 
 export interface Message {
     id: string

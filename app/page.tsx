@@ -64,7 +64,7 @@ const Home: React.FC = () => {
             ),
             title: "浏览模板",
             desc: "从海量模板库中选择",
-            action: () => message.info("模板库即将上线"),
+            action: () => router.push("/templates"),
             bg: "#f9f0ff",
         },
     ]
@@ -107,7 +107,7 @@ const Home: React.FC = () => {
                         }}
                     >
                         <Text strong style={{ color: "#1677ff" }}>
-                            ✨ 新一代在线绘图工具
+                            ✨ IntelliDraw 智能绘图
                         </Text>
                     </div>
 
@@ -134,7 +134,7 @@ const Home: React.FC = () => {
                             lineHeight: 1.8,
                         }}
                     >
-                        简单好用的在线作图工具，支持流程图、思维导图、UML
+                        IntelliDraw 是一款简单好用的在线作图工具，支持流程图、思维导图、UML
                         等多种图形。
                         <br />
                         AI 辅助生成，实时团队协作，让想法即刻落地。

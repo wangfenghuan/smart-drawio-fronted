@@ -25,7 +25,9 @@ const InitLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         // 先判断是否是公开页面，如果是，打印日志并注意不要误拦截
         const isPublic =
             currentPath === "/" ||
-            currentPath.startsWith("/material-marketplace") ||
+            currentPath.startsWith("/templates") ||
+            currentPath.startsWith("/solutions") || // Also add solutions for SEO page
+            currentPath.startsWith("/wiki") ||      // Also add wiki for SEO page
             currentPath.startsWith("/diagram-marketplace") ||
             currentPath.startsWith("/user/") ||
             currentPath.includes("sitemap.xml") ||

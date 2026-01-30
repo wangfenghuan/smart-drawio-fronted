@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link";
 import {
     AppstoreOutlined,
     RocketOutlined,
@@ -282,14 +283,13 @@ export default function MaterialMarketplacePage() {
                         </div>
                     ) : (
                         materials.map((material) => (
-                            <div
+                            <Link
                                 key={material.id}
-                                className="group"
+                                href={`/templates/${material.id}`}
+                                className="group block"
                                 style={{
                                     transition: "all 0.3s ease",
-                                    cursor: "pointer",
                                 }}
-                                onClick={() => handlePreview(material)}
                             >
                                 <Card
                                     hoverable
@@ -462,7 +462,7 @@ export default function MaterialMarketplacePage() {
                                             })()}
                                     </div>
                                 </Card>
-                            </div>
+                            </Link>
                         ))
                     )}
                 </div>

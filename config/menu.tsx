@@ -17,8 +17,8 @@ export const menus: MenuDataItem[] = [
         access: "notLogin",
     },
     {
-        name: "素材市场",
-        path: "/material-marketplace",
+        name: "模板广场",
+        path: "/templates",
         icon: <ShopOutlined />,
         access: "notLogin",
     },

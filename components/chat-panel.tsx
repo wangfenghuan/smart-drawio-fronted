@@ -261,8 +261,7 @@ export default function ChatPanel({
         setMessages,
     } = useChat({
         transport: new DefaultChatTransport({
-            // 强制指向本地 localhost:8081
-            api: "http://localhost:8081/api/chat/stream",
+            api: `${BACKEND_API_URL}/chat/stream`,
         }),
         async onToolCall({ toolCall }) {
             if (DEBUG) {

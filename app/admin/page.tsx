@@ -6,6 +6,7 @@ import {
     MenuFoldOutlined,
     MenuUnfoldOutlined,
     NotificationOutlined,
+    RobotOutlined,
     SafetyOutlined,
     SolutionOutlined,
     TeamOutlined,
@@ -14,6 +15,7 @@ import {
 import { Layout, theme } from "antd"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { AdminAiManagement } from "@/components/admin/AdminAiManagement"
 import { AdminAnnouncementManagement } from "@/components/admin/AdminAnnouncementManagement"
 import { AdminDiagramManagement } from "@/components/admin/AdminDiagramManagement"
 import { AdminFeedbackManagement } from "@/components/admin/AdminFeedbackManagement"
@@ -34,6 +36,7 @@ type AdminTab =
     | "materials"
     | "announcements"
     | "feedback"
+    | "ai"
 
 interface MenuItem {
     key: AdminTab
@@ -82,6 +85,11 @@ const menuItems: MenuItem[] = [
         label: "反馈管理",
         icon: <SolutionOutlined />,
     },
+    {
+        key: "ai",
+        label: "AI 管理",
+        icon: <RobotOutlined />,
+    },
 ]
 
 export default function AdminPage() {
@@ -109,6 +117,8 @@ export default function AdminPage() {
                 return <AdminAnnouncementManagement />
             case "feedback":
                 return <AdminFeedbackManagement />
+            case "ai":
+                return <AdminAiManagement />
             default:
                 return <AdminUserManagement />
         }
