@@ -26,7 +26,7 @@
     "scripts": {
         "dev": "next dev --port 6002",
         "openapi": "node openapi.config.ts",
-        "build": "next build --no-lint",
+        "build": "next build",
         "start": "next start --port 6001",
         "lint": "biome lint .",
         "format": "biome check --write .",
