@@ -35,7 +35,11 @@ export default async function Image({ params }: { params: { id: string } }) {
   // 1. Fetch Data
   let material: BaseResponseMaterialVO['data'] = {}
   try {
-      const dataRes = await fetch(`http://47.95.35.178:8081/api/material/get/vo?id=${id}`)
+      const apiUrl =
+          process.env.NODE_ENV === "development"
+              ? "http://localhost:8081/api"
+              : "http://47.95.35.178:8081/api"
+      const dataRes = await fetch(`${apiUrl}/material/get/vo?id=${id}`)
       if (dataRes.ok) {
            const json: BaseResponseMaterialVO = await dataRes.json()
            material = json.data || {}

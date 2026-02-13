@@ -41,7 +41,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     try {
         // Fetch latest templates (adjust pageSize as needed, e.g. 100 or 1000)
         // Using the same endpoint as the frontend
-        const response = await fetch("http://47.95.35.178:8081/api/material/list/page/vo", {
+        const apiUrl =
+            process.env.NODE_ENV === "development"
+                ? "http://localhost:8081/api"
+                : "http://47.95.35.178:8081/api"
+        const response = await fetch(`${apiUrl}/material/list/page/vo`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

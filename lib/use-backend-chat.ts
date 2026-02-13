@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react"
 
-// 强制指向线上 47.95.35.178
-const API_BASE_URL = "http://47.95.35.178:8081/api"
+// 移除硬编码，使用相对路径，由 Next.js 代理处理
+const API_BASE_URL = "/api"
 
 export interface Message {
     id: string

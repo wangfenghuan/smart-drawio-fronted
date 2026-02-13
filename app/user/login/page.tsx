@@ -41,10 +41,7 @@ const UserLogin: React.FC = () => {
     }
 
     const handleGithubLogin = () => {
-        const isDev = process.env.NODE_ENV === "development"
-        const baseURL = isDev
-            ? "http://localhost:8081/api"
-            : "http://47.95.35.178:8081/api"
+        const baseURL = "/api"
         window.location.href = `${baseURL}/oauth2/authorization/github`
     }
 

@@ -51,6 +51,19 @@ const GlobalFooter: React.FC = () => {
                         <GithubOutlined /> 程序员 wfh
                     </a>
                 </div>
+                <div>
+                    <a
+                        href="https://beian.miit.gov.cn/"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                            color: "rgba(0, 0, 0, 0.45)",
+                            textDecoration: "none",
+                        }}
+                    >
+                        冀ICP备2026004927号
+                    </a>
+                </div>
             </div>
         </div>
     )

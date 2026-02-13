@@ -34,7 +34,11 @@ interface MaterialVO {
 
 async function getMaterial(id: string): Promise<MaterialVO | null> {
     try {
-        const res = await fetch(`http://47.95.35.178:8081/api/material/get/vo?id=${id}`, {
+        const apiUrl =
+            process.env.NODE_ENV === "development"
+                ? "http://localhost:8081/api"
+                : "http://47.95.35.178:8081/api"
+        const res = await fetch(`${apiUrl}/material/get/vo?id=${id}`, {
             next: { revalidate: 60 }, // Revalidate every 60 seconds
         })
         
@@ -92,28 +96,43 @@ export default async function TemplatePage({ params }: Props) {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 py-12">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <div className="min-h-screen bg-slate-50 py-12 relative overflow-hidden">
+             {/* Background decorative elements */}
+             <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none" />
+             <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-30 pointer-events-none" />
+             <div className="absolute top-48 -left-24 w-72 h-72 bg-indigo-100 rounded-full blur-3xl opacity-30 pointer-events-none" />
+
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10">
                 <div className="mb-8">
-                    <Link href="/templates" className="text-slate-500 hover:text-slate-900 flex items-center gap-2 transition-colors">
-                        <ArrowLeft className="w-4 h-4" />
-                        返回模板库
+                    <Link href="/templates" className="inline-flex items-center text-slate-500 hover:text-slate-900 transition-colors group">
+                        <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center mr-3 group-hover:border-slate-300 shadow-sm transition-all">
+                             <ArrowLeft className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+                        </div>
+                        <span className="font-medium">返回模板库</span>
                     </Link>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="grid grid-cols-1 md:grid-cols-3">
-                        {/* Left: Preview Image */}
-                        <div className="md:col-span-2 bg-slate-100 p-8 flex items-center justify-center border-b md:border-b-0 md:border-r border-gray-100 h-[500px]">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden flex flex-col md:flex-row">
+                    {/* Left: Preview Image */}
+                    <div className="md:w-7/12 lg:w-2/3 bg-slate-100 relative group overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 min-h-[250px] md:min-h-[350px] flex items-center justify-center">
+                         {/* Dot Grid Pattern Background */}
+                         <div className="absolute inset-0 opacity-[0.4]" 
+                              style={{ 
+                                  backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', 
+                                  backgroundSize: '20px 20px' 
+                              }} 
+                         />
+                         
+                         <div className="relative z-10 w-full h-full p-8 flex items-center justify-center">
                              {material.pictureUrl || material.svgUrl ? (
                                 // biome-ignore lint/performance/noImgElement: External image URL
                                 <img
                                     src={material.pictureUrl || material.svgUrl}
                                     alt={material.name}
-                                    className="max-w-full max-h-full object-contain shadow-lg rounded-lg bg-white"
+                                    className="max-w-full max-h-full object-contain shadow-2xl rounded-lg bg-white transition-transform duration-500 group-hover:scale-[1.02]"
                                 />
                              ) : material.diagramCode ? (
-                                <div className="w-full h-full shadow-lg rounded-lg bg-white overflow-hidden p-2">
+                                <div className="w-full h-full shadow-2xl rounded-lg bg-white overflow-hidden p-2 transition-transform duration-500 group-hover:scale-[1.02]">
                                      <MaterialViewer 
                                         xml={material.diagramCode}
                                         className="w-full h-full scale-100"
@@ -122,43 +141,70 @@ export default async function TemplatePage({ params }: Props) {
                                 </div>
                              ) : (
                                 <div className="w-full aspect-video bg-white shadow-sm rounded-lg flex items-center justify-center text-slate-400">
-                                    暂无预览图片
+                                    <div className="text-center">
+                                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <span className="text-2xl">🖼️</span>
+                                        </div>
+                                        暂无预览图片
+                                    </div>
                                 </div>
                              )}
-                        </div>
+                         </div>
+                    </div>
 
-                        {/* Right: Info */}
-                        <div className="p-8 flex flex-col">
-                            <div className="mb-auto">
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    {tags.map((tag, i) => (
-                                        <span key={i} className="inline-block px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
+                    {/* Right: Info */}
+                    <div className="md:w-5/12 lg:w-1/3 p-8 lg:p-10 flex flex-col bg-white">
+                        <div className="mb-auto">
+                            <div className="flex flex-wrap gap-2 mb-6">
+                                {tags.length > 0 ? tags.map((tag, i) => (
+                                    <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                        {tag}
+                                    </span>
+                                )) : (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-50 text-slate-500 border border-slate-100">
+                                        未分类
+                                    </span>
+                                )}
+                            </div>
 
-                                <h1 className="text-2xl font-bold text-slate-900 mb-4">
-                                    {material.name || "未命名模板"}
-                                </h1>
-                                <p className="text-slate-600 mb-8 leading-relaxed">
-                                    {material.description || "暂无描述"}
-                                </p>
-                                
-                                <div className="space-y-3 pt-6 border-t border-gray-100 text-sm text-slate-500">
-                                    <div className="flex items-center gap-2">
-                                        <User className="w-4 h-4" />
-                                        <span>作者: {material.userVO?.userName || "未知用户"}</span>
+                            <h1 className="text-3xl font-extrabold text-slate-900 mb-4 tracking-tight leading-tight">
+                                {material.name || "未命名模板"}
+                            </h1>
+                            
+                            <div className="flex items-center gap-3 mb-8 pb-8 border-b border-slate-100">
+                                <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 p-[2px]">
+                                    <div className="h-full w-full rounded-full bg-white overflow-hidden">
+                                        {material.userVO?.userAvatar ? (
+                                            <img src={material.userVO.userAvatar} alt={material.userVO.userName} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <div className="h-full w-full bg-slate-100 flex items-center justify-center text-slate-400">
+                                                <User className="w-5 h-5" />
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Clock className="w-4 h-4" />
-                                        <span>时间: {material.createTime ? new Date(material.createTime).toLocaleDateString() : '未知'}</span>
+                                </div>
+                                <div>
+                                    <div className="text-sm font-semibold text-slate-900">
+                                        {material.userVO?.userName || "未知用户"}
+                                    </div>
+                                    <div className="text-xs text-slate-500 flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        <span>发布于 {material.createTime ? new Date(material.createTime).toLocaleDateString() : '未知'}</span>
                                     </div>
                                 </div>
                             </div>
+                            
+                            <div className="prose prose-slate prose-sm text-slate-600 mb-8">
+                                <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-2">简介</h3>
+                                <p className="leading-relaxed">
+                                    {material.description || "暂无描述，作者很懒什么都没写~"}
+                                </p>
+                            </div>
+                        </div>
 
-                            <div className="mt-10 space-y-4">
-                                <TemplateDetailActions material={material} />
+                        <div className="mt-8 space-y-4">
+                            <TemplateDetailActions material={material} />
+                            <div className="pt-4 border-t border-slate-50">
                                 <ShareButton title={material.name || "IntelliDraw 模板"} />
                             </div>
                         </div>

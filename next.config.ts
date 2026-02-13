@@ -10,10 +10,13 @@ const nextConfig: NextConfig = {
         ignoreBuildErrors: true,
     },
     async rewrites() {
+        const isDev = process.env.NODE_ENV === "development"
         return [
             {
                 source: "/api/:path*",
-                destination: "http://47.95.35.178:8081/api/:path*",
+                destination: isDev
+                    ? "http://localhost:8081/api/:path*"
+                    : "http://47.95.35.178:8081/api/:path*",
             },
         ]
     },

@@ -228,9 +228,7 @@ export async function uploadAvataImage(
 ) {
     return request<API.BaseResponseString>("/user/upload/image", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
+
         data: body,
         ...(options || {}),
     })

@@ -7,6 +7,7 @@ import {
     LoadingOutlined,
     MailOutlined,
     PlusOutlined,
+    SafetyCertificateOutlined,
     SafetyOutlined,
     UserOutlined,
 } from "@ant-design/icons"
@@ -25,7 +26,9 @@ import {
     Tag,
     Typography,
     Upload,
+    Tabs,
 } from "antd"
+import { sendRegisterCode, updateUserAccount } from "@/api/userController"
 import type { UploadChangeParam } from "antd/es/upload"
 import type { RcFile, UploadFile, UploadProps } from "antd/es/upload/interface"
 import { useParams } from "next/navigation"
@@ -54,6 +57,7 @@ export default function UserProfilePage() {
     const [editModalVisible, setEditModalVisible] = useState(false)
     const [confirmLoading, setConfirmLoading] = useState(false)
     const [avatarLoading, setAvatarLoading] = useState(false)
+    const [securityModalVisible, setSecurityModalVisible] = useState(false)
     const [form] = Form.useForm()
 
     // 判断是否是当前登录用户的个人主页
@@ -67,7 +71,7 @@ export default function UserProfilePage() {
         setLoading(true)
         try {
             const response = await getUserVoById({
-                id: userId,
+                id: Number(userId),
             })
 
             // lib/request.ts 拦截器返回的是 data 本身
@@ -323,18 +327,31 @@ export default function UserProfilePage() {
                                     </div>
                                 </div>
                                 {isOwner && (
-                                    <Button
-                                        type="primary"
-                                        size="large"
-                                        icon={<EditOutlined />}
-                                        onClick={handleEdit}
-                                        style={{
-                                            borderRadius: "6px",
-                                            padding: "0 24px",
-                                        }}
-                                    >
-                                        编辑资料
-                                    </Button>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <Button
+                                            type="default"
+                                            size="large"
+                                            icon={<SafetyCertificateOutlined />}
+                                            onClick={() => setSecurityModalVisible(true)}
+                                            style={{
+                                                borderRadius: "6px",
+                                            }}
+                                        >
+                                            安全设置
+                                        </Button>
+                                        <Button
+                                            type="primary"
+                                            size="large"
+                                            icon={<EditOutlined />}
+                                            onClick={handleEdit}
+                                            style={{
+                                                borderRadius: "6px",
+                                                padding: "0 24px",
+                                            }}
+                                        >
+                                            编辑资料
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
 
@@ -520,6 +537,225 @@ export default function UserProfilePage() {
                     </Form>
                 </div>
             </Modal>
+            {/* 安全设置模态框 */}
+            <SecuritySettingsModal
+                open={securityModalVisible}
+                onCancel={() => setSecurityModalVisible(false)}
+                currentUser={user}
+            />
         </div>
+    )
+}
+
+// ----------------------
+// 安全设置模态框组件
+// ----------------------
+const SecuritySettingsModal = ({ open, onCancel, currentUser }: { open: boolean; onCancel: () => void; currentUser: API.UserVO | null }) => {
+    const { message } = App.useApp()
+    const [activeTab, setActiveTab] = useState("password")
+    const [passwordForm] = Form.useForm()
+    const [emailForm] = Form.useForm()
+    const [loading, setLoading] = useState(false)
+    
+    // 验证码倒计时状态
+    const [pwdCountdown, setPwdCountdown] = useState(0)
+    const [emailCountdown, setEmailCountdown] = useState(0)
+
+    useEffect(() => {
+        let timer: NodeJS.Timeout
+        if (pwdCountdown > 0) {
+            timer = setTimeout(() => setPwdCountdown(c => c - 1), 1000)
+        }
+        return () => clearTimeout(timer)
+    }, [pwdCountdown])
+
+    useEffect(() => {
+        let timer: NodeJS.Timeout
+        if (emailCountdown > 0) {
+            timer = setTimeout(() => setEmailCountdown(c => c - 1), 1000)
+        }
+        return () => clearTimeout(timer)
+    }, [emailCountdown])
+
+    // 通用发送验证码
+    const sendCode = async (email: string, type: 'password' | 'email') => {
+        if (!email) {
+            message.error("邮箱不能为空")
+            return
+        }
+        try {
+            const res = await sendRegisterCode({ userAccount: email })
+            if (res.code === 0) {
+                message.success("验证码已发送")
+                if (type === 'password') setPwdCountdown(60)
+                else setEmailCountdown(60)
+            } else {
+                message.error(res.message || "发送失败")
+            }
+        } catch (e) {
+            message.error("发送失败，请稍后重试")
+        }
+    }
+
+    // 修改密码提交
+    const handleUpdatePassword = async () => {
+        try {
+            const values = await passwordForm.validateFields()
+            setLoading(true)
+            const res = await updateUserAccount({
+               userAccount: currentUser?.userAccount, // 使用当前账号
+               ...values
+            })
+            if (res.code === 0) {
+                message.success("密码修改成功")
+                passwordForm.resetFields()
+                onCancel()
+            } else {
+                message.error(res.message || "修改失败")
+            }
+        } catch (e) {
+            // form validate error or api error
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // 修改邮箱提交
+    const handleUpdateEmail = async () => {
+        try {
+            const values = await emailForm.validateFields()
+            setLoading(true)
+            // 绑定新邮箱：传入 userAccount 为新邮箱
+            const res = await updateUserAccount({
+               ...values
+            })
+            if (res.code === 0) {
+                message.success("邮箱绑定成功，下次请使用新邮箱登录")
+                emailForm.resetFields()
+                onCancel()
+                // 页面可能需要刷新或者登出，这里暂时只关闭弹窗，用户刷新页面后会看到新信息（如果接口更新了 Session）
+                // 建议刷新页面
+                window.location.reload()
+            } else {
+                message.error(res.message || "修改失败")
+            }
+        } catch (e) {
+             // error
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <Modal
+            title="安全设置"
+            open={open}
+            onCancel={onCancel}
+            footer={null}
+            destroyOnClose
+        >
+            <Tabs
+                activeKey={activeTab}
+                onChange={setActiveTab}
+                items={[
+                    {
+                        key: "password",
+                        label: "修改密码",
+                        children: (
+                            <Form form={passwordForm} layout="vertical" onFinish={handleUpdatePassword}>
+                                <div style={{ marginBottom: 16 }}>
+                                   <Tag color="blue">当前账号: {currentUser?.userAccount}</Tag>
+                                </div>
+                                <Form.Item
+                                    label="邮箱验证码"
+                                    name="emailCode"
+                                    rules={[{ required: true, message: "请输入验证码" }]}
+                                >
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <Input placeholder="输入验证码" />
+                                        <Button 
+                                            disabled={pwdCountdown > 0}
+                                            onClick={() => sendCode(currentUser?.userAccount || '', 'password')}
+                                        >
+                                            {pwdCountdown > 0 ? `${pwdCountdown}s` : "获取验证码"}
+                                        </Button>
+                                    </div>
+                                </Form.Item>
+                                <Form.Item
+                                    label="新密码"
+                                    name="newPassword"
+                                    rules={[{ required: true, message: "请输入新密码" }, { min: 8, message: "密码至少8位" }]}
+                                >
+                                    <Input.Password placeholder="请输入新密码" />
+                                </Form.Item>
+                                <Form.Item
+                                    label="确认新密码"
+                                    name="checkPassword"
+                                    dependencies={['newPassword']}
+                                    rules={[
+                                        { required: true, message: "请确认新密码" },
+                                        ({ getFieldValue }) => ({
+                                            validator(_, value) {
+                                                if (!value || getFieldValue('newPassword') === value) {
+                                                    return Promise.resolve();
+                                                }
+                                                return Promise.reject(new Error('两次密码不一致'));
+                                            },
+                                        }),
+                                    ]}
+                                >
+                                    <Input.Password placeholder="请再次输入新密码" />
+                                </Form.Item>
+                                <Button type="primary" htmlType="submit" loading={loading} block>确认修改</Button>
+                            </Form>
+                        )
+                    },
+                    {
+                        key: "email",
+                        label: "换绑邮箱",
+                        children: (
+                             <Form form={emailForm} layout="vertical" onFinish={handleUpdateEmail}>
+                                <div style={{ marginBottom: 16, color: '#999' }}>
+                                    换绑后，您将使用新邮箱进行登录。
+                                </div>
+                                <Form.Item
+                                    label="新邮箱地址"
+                                    name="userAccount"
+                                    rules={[
+                                        { required: true, message: "请输入新邮箱" },
+                                        { type: 'email', message: '邮箱格式不正确' }
+                                    ]}
+                                >
+                                    <Input placeholder="请输入新的邮箱地址" />
+                                </Form.Item>
+                                <Form.Item
+                                    label="验证码"
+                                    name="emailCode"
+                                    rules={[{ required: true, message: "请输入验证码" }]}
+                                >
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <Input placeholder="输入新邮箱收到的验证码" />
+                                        <Button 
+                                            disabled={emailCountdown > 0}
+                                            onClick={async () => {
+                                                try {
+                                                    const email = await emailForm.validateFields(['userAccount']).then(v => v.userAccount)
+                                                    sendCode(email, 'email')
+                                                } catch(e) {
+                                                    // validation failed
+                                                }
+                                            }}
+                                        >
+                                            {emailCountdown > 0 ? `${emailCountdown}s` : "获取验证码"}
+                                        </Button>
+                                    </div>
+                                </Form.Item>
+                                <Button type="primary" htmlType="submit" loading={loading} block>确认换绑</Button>
+                            </Form>
+                        )
+                    }
+                ]}
+            />
+        </Modal>
     )
 }

@@ -20,7 +20,11 @@ interface BaseResponsePageMaterialVO {
 
 async function getMaterials(page = 1, pageSize = 12) {
     try {
-        const res = await fetch("http://47.95.35.178:8081/api/material/list/page/vo", {
+        const apiUrl =
+            process.env.NODE_ENV === "development"
+                ? "http://localhost:8081/api"
+                : "http://47.95.35.178:8081/api"
+        const res = await fetch(`${apiUrl}/material/list/page/vo`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

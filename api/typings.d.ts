@@ -1411,6 +1411,10 @@ declare namespace API {
         userProfile?: string
         /** 用户角色 */
         userRole?: string
+        /** 用户账号 */
+        userAccount?: string
+        /** 更新时间 */
+        updateTime?: string
         authorities?: SysAuthority[]
         /** 创建时间 */
         createTime?: string

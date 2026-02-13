@@ -114,10 +114,7 @@ export function useDiagramSave(drawioRef: React.Ref<DrawIoEmbedRef | null>) {
                 )
 
                 const API_BASE_URL =
-                    process.env.NEXT_PUBLIC_API_BASE_URL ||
-                    (process.env.NODE_ENV === "development"
-                        ? "http://localhost:8081/api"
-                        : "http://47.95.35.178:8081/api")
+                    process.env.NEXT_PUBLIC_API_BASE_URL || "/api"
 
                 const response = await fetch(`${API_BASE_URL}/diagram/upload`, {
                     method: "POST",
