@@ -9,6 +9,7 @@ import {
     isTextFile,
     MAX_EXTRACTED_CHARS,
 } from "@/lib/pdf-utils"
+import { isZipFile, processZipFile } from "@/lib/zip-processor"
 
 export interface FileData {
     text: string
@@ -27,10 +28,10 @@ export function useFileProcessor() {
     const handleFileChange = async (newFiles: File[]) => {
         setFiles(newFiles)
 
-        // Extract text immediately for new PDF/text files
+        // Extract text immediately for new PDF/text/ZIP files
         for (const file of newFiles) {
             const needsExtraction =
-                (isPdfFile(file) || isTextFile(file)) && !pdfData.has(file)
+                (isPdfFile(file) || isTextFile(file) || isZipFile(file)) && !pdfData.has(file)
             if (needsExtraction) {
                 // Mark as extracting
                 setPdfData((prev) => {
@@ -46,14 +47,35 @@ export function useFileProcessor() {
                 // Extract text asynchronously
                 try {
                     let text: string
-                    if (isPdfFile(file)) {
+                    if (isZipFile(file)) {
+                        // Process ZIP file: extract Java code and parse AST
+                        const result = await processZipFile(file, (phase, current, total) => {
+                            // Update progress in pdfData
+                            setPdfData((prev) => {
+                                const next = new Map(prev)
+                                next.set(file, {
+                                    text: `${phase} (${current}/${total})`,
+                                    charCount: 0,
+                                    isExtracting: true,
+                                })
+                                return next
+                            })
+                        })
+                        text = result.prompt
+                        if (result.errors.length > 0) {
+                            console.warn("[ZipProcessor] Warnings:", result.errors)
+                        }
+                        toast.success(
+                            `已解析 ${result.metadata.totalFiles} 个文件, ${result.metadata.totalClasses} 个类`,
+                        )
+                    } else if (isPdfFile(file)) {
                         text = await extractPdfText(file)
                     } else {
                         text = await extractTextFileContent(file)
                     }
 
-                    // Check character limit
-                    if (text.length > MAX_EXTRACTED_CHARS) {
+                    // Check character limit (skip for ZIP files, they are pre-processed)
+                    if (!isZipFile(file) && text.length > MAX_EXTRACTED_CHARS) {
                         const limitK = MAX_EXTRACTED_CHARS / 1000
                         toast.error(
                             `${file.name}: Content exceeds ${limitK}k character limit (${(text.length / 1000).toFixed(1)}k chars)`,
@@ -79,7 +101,7 @@ export function useFileProcessor() {
                     })
                 } catch (error) {
                     console.error("Failed to extract text:", error)
-                    toast.error(`Failed to read file: ${file.name}`)
+                    toast.error(`处理文件失败: ${file.name} - ${error}`)
                     setPdfData((prev) => {
                         const next = new Map(prev)
                         next.delete(file)

@@ -22,6 +22,7 @@ import {
 } from "../lib/cryptoUtils"
 import { usePersistence } from "../lib/use-persistence"
 import { useYjsCollaboration } from "../lib/use-yjs-collaboration"
+import type { OnlineUser } from "../lib/yjs-collab"
 import { extractDiagramXML, validateAndFixXml } from "../lib/utils"
 
 interface DiagramContextType {
@@ -50,6 +51,7 @@ interface DiagramContextType {
     collaborationEnabled: boolean
     collaborationConnected: boolean
     collaborationUserCount: number
+    collaborationOnlineUsers: OnlineUser[]
     toggleCollaboration: (
         enabled: boolean,
         roomName?: string,
@@ -211,6 +213,7 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
     const {
         isConnected: collaborationConnected,
         userCount: collaborationUserCount,
+        onlineUsers: collaborationOnlineUsers,
         pushUpdate,
         // sendPointer,
         getDocument,
@@ -653,6 +656,7 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
                 collaborationEnabled,
                 collaborationConnected,
                 collaborationUserCount,
+                collaborationOnlineUsers,
                 toggleCollaboration,
                 hasUnsavedChanges,
                 setHasUnsavedChanges,

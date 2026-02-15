@@ -1,6 +1,7 @@
 "use client"
 
 import {
+    Archive,
     Download,
     History,
     Image as ImageIcon,
@@ -27,13 +28,15 @@ import {
 } from "@/components/ui/tooltip"
 import { useDiagram } from "@/contexts/diagram-context"
 import { isPdfFile, isTextFile } from "@/lib/pdf-utils"
+import { isZipFile } from "@/lib/zip-processor"
 import { FilePreviewList } from "./file-preview-list"
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024 // 2MB
+const MAX_ZIP_SIZE = 50 * 1024 * 1024 // 50MB
 const MAX_FILES = 5
 
 function isValidFileType(file: File): boolean {
-    return file.type.startsWith("image/") || isPdfFile(file) || isTextFile(file)
+    return file.type.startsWith("image/") || isPdfFile(file) || isTextFile(file) || isZipFile(file)
 }
 
 function formatFileSize(bytes: number): string {
@@ -79,9 +82,18 @@ function validateFiles(
             errors.push(`"${file.name}" is not a supported file type`)
             continue
         }
-        // Only check size for images (PDFs/text files are extracted client-side, so file size doesn't matter)
+        // Check size limits: images 2MB, ZIPs 50MB, PDFs/text no limit
         const isExtractedFile = isPdfFile(file) || isTextFile(file)
-        if (!isExtractedFile && file.size > MAX_IMAGE_SIZE) {
+        if (isZipFile(file)) {
+            if (file.size > MAX_ZIP_SIZE) {
+                const maxSizeMB = MAX_ZIP_SIZE / 1024 / 1024
+                errors.push(
+                    `"${file.name}" is ${formatFileSize(file.size)} (exceeds ${maxSizeMB}MB)`,
+                )
+            } else {
+                validFiles.push(file)
+            }
+        } else if (!isExtractedFile && file.size > MAX_IMAGE_SIZE) {
             const maxSizeMB = MAX_IMAGE_SIZE / 1024 / 1024
             errors.push(
                 `"${file.name}" is ${formatFileSize(file.size)} (exceeds ${maxSizeMB}MB)`,
@@ -167,6 +179,7 @@ export function ChatInput({
     const { diagramHistory, saveDiagramToFile } = useDiagram()
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const zipInputRef = useRef<HTMLInputElement>(null)
     const [isDragging, setIsDragging] = useState(false)
     const [showClearDialog, setShowClearDialog] = useState(false)
     const [showSaveDialog, setShowSaveDialog] = useState(false)
@@ -450,6 +463,18 @@ export function ChatInput({
                             <ImageIcon className="h-4 w-4" />
                         </ButtonWithTooltip>
 
+                        <ButtonWithTooltip
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => zipInputRef.current?.click()}
+                            disabled={isDisabled}
+                            tooltipContent="上传代码压缩包 (.zip)，自动解析 Java 代码结构"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                        >
+                            <Archive className="h-4 w-4" />
+                        </ButtonWithTooltip>
+
                         <input
                             type="file"
                             ref={fileInputRef}
@@ -457,6 +482,15 @@ export function ChatInput({
                             onChange={handleFileChange}
                             accept="image/*,.pdf,application/pdf,text/*,.md,.markdown,.json,.csv,.xml,.yaml,.yml,.toml"
                             multiple
+                            disabled={isDisabled}
+                        />
+
+                        <input
+                            type="file"
+                            ref={zipInputRef}
+                            className="hidden"
+                            onChange={handleFileChange}
+                            accept=".zip,application/zip,application/x-zip-compressed"
                             disabled={isDisabled}
                         />
 

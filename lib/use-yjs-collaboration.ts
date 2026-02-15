@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import type { UserRole } from "./collab-protocol"
-import { createYjsCollaboration, type YjsCollaboration } from "./yjs-collab"
+import { createYjsCollaboration, type OnlineUser, type YjsCollaboration } from "./yjs-collab"
 
 export interface UseYjsCollaborationOptions {
     roomName: string
@@ -39,6 +39,7 @@ export function useYjsCollaboration({
 }: UseYjsCollaborationOptions) {
     const [isConnected, setIsConnected] = useState(false)
     const [userCount, setUserCount] = useState(0)
+    const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
     const collabRef = useRef<YjsCollaboration | null>(null)
 
     console.log("[useYjsCollaboration] Render with:", {
@@ -101,6 +102,9 @@ export function useYjsCollaboration({
             onUserCountChange: (count) => {
                 console.log("[useYjsCollaboration] User count changed:", count)
                 setUserCount(count)
+            },
+            onOnlineUsersChange: (users) => {
+                setOnlineUsers(users)
             },
         })
 
@@ -171,6 +175,7 @@ export function useYjsCollaboration({
     return {
         isConnected,
         userCount,
+        onlineUsers,
         pushUpdate,
         sendPointer,
         getDocument,

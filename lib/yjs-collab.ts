@@ -5,6 +5,14 @@ import { HocuspocusProvider } from "@hocuspocus/provider"
 import * as Y from "yjs"
 import type { UserRole } from "./collab-protocol"
 
+// 在线用户信息类型
+export interface OnlineUser {
+    clientID: number
+    userId: string
+    userName: string
+    isCurrentUser: boolean
+}
+
 export interface YjsCollaborationOptions {
     roomName: string
     serverUrl: string // WebSocket 服务器 URL
@@ -18,6 +26,7 @@ export interface YjsCollaborationOptions {
         status: "connecting" | "connected" | "disconnected",
     ) => void
     onUserCountChange?: (count: number) => void
+    onOnlineUsersChange?: (users: OnlineUser[]) => void
 }
 
 export class YjsCollaboration {
@@ -135,10 +144,22 @@ export class YjsCollaboration {
                     console.log("[YjsCollab] 👥 User count:", count)
                     this.options.onUserCountChange?.(count)
 
-                    // 处理光标移动 (Awareness)
+                    // 构建在线用户列表
+                    const onlineUsers: OnlineUser[] = []
+                    const myClientID = this.provider?.awareness?.clientID
+
+                    // 处理光标移动 (Awareness) 和收集用户信息
                     states.forEach((state: any, clientID: number) => {
-                        if (clientID === this.provider?.awareness?.clientID)
-                            return
+                        // 收集用户信息
+                        onlineUsers.push({
+                            clientID,
+                            userId: state.cursor?.userId || state.user?.userId || String(clientID),
+                            userName: state.cursor?.userName || state.user?.userName || `用户${clientID}`,
+                            isCurrentUser: clientID === myClientID,
+                        })
+
+                        // 处理光标移动
+                        if (clientID === myClientID) return
                         if (state.cursor) {
                             this.options.onPointerMove?.({
                                 ...state.cursor,
@@ -146,6 +167,8 @@ export class YjsCollaboration {
                             })
                         }
                     })
+
+                    this.options.onOnlineUsersChange?.(onlineUsers)
                 },
             })
         } catch (error) {
@@ -230,6 +253,26 @@ export class YjsCollaboration {
      */
     getUserCount(): number {
         return this.provider?.awareness?.getStates().size || 0
+    }
+
+    /**
+     * 获取在线用户列表
+     */
+    getOnlineUsers(): OnlineUser[] {
+        const states = this.provider?.awareness?.getStates()
+        const myClientID = this.provider?.awareness?.clientID
+        if (!states) return []
+
+        const users: OnlineUser[] = []
+        states.forEach((state: any, clientID: number) => {
+            users.push({
+                clientID,
+                userId: state.cursor?.userId || state.user?.userId || String(clientID),
+                userName: state.cursor?.userName || state.user?.userName || `用户${clientID}`,
+                isCurrentUser: clientID === myClientID,
+            })
+        })
+        return users
     }
 
     /**

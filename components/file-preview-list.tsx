@@ -1,9 +1,10 @@
 "use client"
 
-import { FileCode, FileText, Loader2, X } from "lucide-react"
+import { Archive, FileCode, FileText, Loader2, X } from "lucide-react"
 import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
 import { isPdfFile, isTextFile } from "@/lib/pdf-utils"
+import { isZipFile } from "@/lib/zip-processor"
 
 function formatCharCount(count: number): string {
     if (count >= 1000) {
@@ -110,6 +111,28 @@ export function FilePreviewList({
                                         className="object-cover w-full h-full"
                                         unoptimized
                                     />
+                                ) : isZipFile(file) ? (
+                                    <div className="flex flex-col items-center justify-center h-full p-1">
+                                        {pdfInfo?.isExtracting ? (
+                                            <Loader2 className="h-6 w-6 text-orange-500 mb-1 animate-spin" />
+                                        ) : (
+                                            <Archive className="h-6 w-6 text-orange-500 mb-1" />
+                                        )}
+                                        <span className="text-xs text-center truncate w-full px-1">
+                                            {file.name.length > 10
+                                                ? `${file.name.slice(0, 7)}...`
+                                                : file.name}
+                                        </span>
+                                        {pdfInfo?.isExtracting ? (
+                                            <span className="text-[10px] text-muted-foreground">
+                                                {pdfInfo.text || "解析中..."}
+                                            </span>
+                                        ) : pdfInfo?.charCount ? (
+                                            <span className="text-[10px] text-green-600 font-medium">
+                                                已解析
+                                            </span>
+                                        ) : null}
+                                    </div>
                                 ) : isPdfFile(file) || isTextFile(file) ? (
                                     <div className="flex flex-col items-center justify-center h-full p-1">
                                         {pdfInfo?.isExtracting ? (

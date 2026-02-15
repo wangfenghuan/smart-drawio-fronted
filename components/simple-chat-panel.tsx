@@ -4,6 +4,7 @@ import {
     ChevronDown,
     Code,
     Download,
+    Archive,
     MessageSquare,
     Save,
     Send,
@@ -31,6 +32,9 @@ import {
 import { useDiagram } from "@/contexts/diagram-context"
 import { type Message, useBackendChat } from "@/lib/use-backend-chat"
 import { useDiagramSave } from "@/lib/use-diagram-save"
+import { useFileProcessor } from "@/lib/use-file-processor"
+import { isZipFile } from "@/lib/zip-processor"
+import { FilePreviewList } from "@/components/file-preview-list"
 import { parseXmlAndLoadDiagram } from "@/lib/utils"
 import type { RootState } from "@/stores"
 
@@ -56,6 +60,10 @@ export default function SimpleChatPanel({
     const [configDialogOpen, setConfigDialogOpen] = useState(false)
     const [downloadDialogOpen, setDownloadDialogOpen] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    
+    // File upload state and hooks
+    const { files, pdfData, handleFileChange, setFiles } = useFileProcessor()
+    const zipInputRef = useRef<HTMLInputElement>(null)
 
     const [aiConfig, setAiConfig] = useAIConfig()
     const {
@@ -105,7 +113,7 @@ export default function SimpleChatPanel({
             try {
                 const response = await listDiagramChatHistory({
                     diagramId: diagramId,
-                    pageSize: "100",
+                    pageSize: 100,
                 })
                 if (response?.code === 0 && response?.data?.records) {
                     const conversions = response.data.records
@@ -198,10 +206,43 @@ export default function SimpleChatPanel({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!input.trim() || isLoading) return
-        const userMessage = input.trim()
+        if ((!input.trim() && files.length === 0) || isLoading) return
+        
+        let messageContent = input.trim()
+        
+        // Process files if any
+        if (files.length > 0) {
+            const filePrompts: string[] = []
+            
+            for (const file of files) {
+                const data = pdfData.get(file)
+                if (data && !data.isExtracting) {
+                    if (isZipFile(file)) {
+                        // For ZIP files, the prompt is already pre-generated during extraction
+                        filePrompts.push(data.text)
+                    } else {
+                        // For other files
+                        filePrompts.push(`\n\n[文件上下文: ${file.name}]\n${data.text}\n`)
+                    }
+                } else if (data && data.isExtracting) {
+                    toast.warning(`正在处理文件 ${file.name}，请稍候...`)
+                    return
+                }
+            }
+            
+            if (filePrompts.length > 0) {
+                const combinedPrompt = filePrompts.join("\n")
+                // If user didn't type anything, use a default prompt
+                if (!messageContent) {
+                    messageContent = "请分析上传的代码/文件内容。"
+                }
+                messageContent = `${messageContent}\n\n${combinedPrompt}`
+            }
+        }
+
         setInput("")
-        await sendMessage(userMessage)
+        setFiles([]) // Clear files after sending
+        await sendMessage(messageContent)
     }
 
     const handleClearChat = () => {
@@ -258,7 +299,7 @@ export default function SimpleChatPanel({
             await Promise.race([
                 saveDiagramToServer({
                     diagramId: diagramId,
-                    userId: loginUser.id,
+                    userId: loginUser?.id || "",
                     title: diagramTitle,
                     xml: latestXML || "", // ✅ 使用最新导出的 XML
                 }),
@@ -427,11 +468,11 @@ export default function SimpleChatPanel({
                                                         components={{
                                                             code({
                                                                 node,
-                                                                inline,
                                                                 className,
                                                                 children,
                                                                 ...props
-                                                            }) {
+                                                            }: any) {
+                                                                const { inline } = props
                                                                 const match =
                                                                     /language-(\w+)/.exec(
                                                                         className ||
@@ -572,7 +613,43 @@ export default function SimpleChatPanel({
 
             {/* 底部输入框 */}
             <div className="flex-shrink-0 p-4 border-t border-white/10 bg-black/20 z-10">
+                {/* File Previews */}
+                {files.length > 0 && (
+                    <div className="mb-3">
+                         <FilePreviewList
+                            files={files}
+                            onRemoveFile={(file) => setFiles(files.filter(f => f !== file))}
+                            pdfData={pdfData}
+                        />
+                    </div>
+                )}
+                
                 <form onSubmit={handleSubmit} className="flex gap-2">
+                    <input
+                        type="file"
+                        ref={zipInputRef}
+                        className="hidden"
+                        onChange={(e) => {
+                            if (e.target.files) {
+                                handleFileChange(Array.from(e.target.files))
+                            }
+                            // Reset input value to allow selecting same file again
+                            if (zipInputRef.current) zipInputRef.current.value = ""
+                        }}
+                        accept=".zip,application/zip,application/x-zip-compressed"
+                    />
+                    
+                    <Button
+                        type="button"
+                        variant="ghost" 
+                        size="icon"
+                        className="text-white/60 hover:text-white hover:bg-white/10 h-[46px] w-[46px] rounded-xl shrink-0"
+                        onClick={() => zipInputRef.current?.click()}
+                        title="上传代码压缩包 (.zip)"
+                    >
+                        <Archive className="h-5 w-5" />
+                    </Button>
+
                     <input
                         type="text"
                         value={input}

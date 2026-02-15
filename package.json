@@ -26,7 +26,7 @@
     "scripts": {
         "dev": "next dev --port 6002",
         "openapi": "node openapi.config.ts",
-        "build": "next build",
+        "build": "next build --turbopack",
         "start": "next start --port 6001",
         "lint": "biome lint .",
         "format": "biome check --write .",
@@ -74,6 +74,7 @@
         "js-tiktoken": "^1.0.21",
         "jsdom": "^26.0.0",
         "jsonrepair": "^3.13.1",
+        "jszip": "^3.10.1",
         "lucide-react": "^0.483.0",
         "motion": "^12.23.25",
         "next": "^16.0.7",
@@ -93,7 +94,9 @@
         "sonner": "^2.0.7",
         "tailwind-merge": "^3.0.2",
         "tailwindcss-animate": "^1.0.7",
+        "tree-sitter-wasms": "^0.1.13",
         "unpdf": "^1.4.0",
+        "web-tree-sitter": "^0.26.5",
         "y-websocket": "^3.0.0",
         "yjs": "^13.6.29",
         "zod": "^4.1.12"

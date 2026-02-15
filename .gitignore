@@ -48,3 +48,4 @@ push-via-ec2.sh
 .wrangler/
 .env*.local
 node_modules.zip
+next.zip
