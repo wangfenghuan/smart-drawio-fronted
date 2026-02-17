@@ -4,7 +4,8 @@ import {
     ChevronDown,
     Code,
     Download,
-
+    FileCode,
+    Database,
     MessageSquare,
     Save,
     Send,
@@ -18,6 +19,7 @@ import { useSelector } from "react-redux"
 import remarkGfm from "remark-gfm"
 import { toast } from "sonner"
 import { listDiagramChatHistory } from "@/api/conversionController"
+import { uploadAndAnalyzeSimple, parseSql } from "@/api/codeparseController"
 import { AIConfigDialog, useAIConfig } from "@/components/ai-config-dialog"
 import { CodeBlock } from "@/components/code-block"
 import { CollaborationPanel } from "@/components/collaboration-panel"
@@ -201,6 +203,62 @@ export default function SimpleChatPanel({
             toast.error(
                 error instanceof Error ? error.message : "下载失败，请稍后重试",
             )
+        }
+    }
+
+    // File input refs for Code/SQL analysis
+    const fileInputCodeRef = useRef<HTMLInputElement>(null)
+    const fileInputSqlRef = useRef<HTMLInputElement>(null)
+
+    const handleCodeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        const toastId = toast.loading("正在分析 Spring Boot 项目...")
+        try {
+            const res = await uploadAndAnalyzeSimple({}, file)
+            if (res.code === 0 && res.data) {
+                // Construct prompt with analysis result
+                const prompt = `我上传了一个 Spring Boot 项目。这是简化的架构分析结果（JSON格式）：\n\n\`\`\`json\n${JSON.stringify(res.data, null, 2)}\n\`\`\`\n\n请分析此架构，并生成**可被 Draw.io 识别的 XML 代码**，用于绘制架构图或类图。请确保生成的 XML 代码可以直接被 Draw.io 加载和显示。重点关注 Controller、Service 和 Repository 层的组件及其关系。请务必将 XML 代码包裹在 \`\`\`xml 和 \`\`\` 代码块中。`
+                
+                // Send message to AI
+                await sendMessage(prompt)
+                toast.success("分析完成，正在生成图表...", { id: toastId })
+            } else {
+                toast.error(res.message || "分析失败", { id: toastId })
+            }
+        } catch (error) {
+            console.error("代码上传错误:", error)
+            toast.error("项目上传失败", { id: toastId })
+        } finally {
+            // Reset input
+            if (fileInputCodeRef.current) fileInputCodeRef.current.value = ""
+        }
+    }
+
+    const handleSqlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        const toastId = toast.loading("正在解析 SQL 文件...")
+        try {
+            const res = await parseSql({}, file)
+            if (res.code === 0 && res.data) {
+                // Construct prompt with analysis result
+                const prompt = `我上传了一个 SQL DDL 文件。这是解析后的表结构（JSON格式）：\n\n\`\`\`json\n${JSON.stringify(res.data, null, 2)}\n\`\`\`\n\n请分析此 schema 并生成**可被 Draw.io 识别的 XML 代码**，用于绘制实体关系 (ER) 图。请包含所有表、列、主键和推断的关系。请务必将 XML 代码包裹在 \`\`\`xml 和 \`\`\` 代码块中。`
+                
+                // Send message to AI
+                await sendMessage(prompt)
+                toast.success("解析完成，正在生成 ER 图...", { id: toastId })
+            } else {
+                toast.error(res.message || "解析失败", { id: toastId })
+            }
+        } catch (error) {
+            console.error("SQL上传错误:", error)
+            toast.error("SQL 文件上传失败", { id: toastId })
+        } finally {
+            // Reset input
+            if (fileInputSqlRef.current) fileInputSqlRef.current.value = ""
         }
     }
 
@@ -619,7 +677,29 @@ export default function SimpleChatPanel({
                     </div>
                 )}
                 
-                <form onSubmit={handleSubmit} className="flex gap-2">
+                <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+                    <div className="flex gap-1 pb-1">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => fileInputCodeRef.current?.click()}
+                            className="h-9 w-9 text-white/60 hover:text-white hover:bg-white/10"
+                            title="上传 Spring Boot 项目 (Zip)"
+                        >
+                            <FileCode className="h-5 w-5" />
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => fileInputSqlRef.current?.click()}
+                            className="h-9 w-9 text-white/60 hover:text-white hover:bg-white/10"
+                            title="上传 SQL 文件"
+                        >
+                            <Database className="h-5 w-5" />
+                        </Button>
+                    </div>
 
 
                     <input
@@ -664,6 +744,22 @@ export default function SimpleChatPanel({
                 onOpenChange={setDownloadDialogOpen}
                 onDownload={handleDownload}
                 defaultFilename={diagramTitle}
+            />
+
+            {/* Hidden file inputs for Code/SQL analysis */}
+            <input
+                type="file"
+                ref={fileInputCodeRef}
+                className="hidden"
+                accept=".zip"
+                onChange={handleCodeUpload}
+            />
+            <input
+                type="file"
+                ref={fileInputSqlRef}
+                className="hidden"
+                accept=".sql"
+                onChange={handleSqlUpload}
             />
         </div>
     )

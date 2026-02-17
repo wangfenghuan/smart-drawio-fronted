@@ -18,6 +18,7 @@ import { FaGithub } from "react-icons/fa"
 import { useSelector } from "react-redux"
 import { Toaster, toast } from "sonner"
 import { listDiagramChatHistory } from "@/api/conversionController"
+import { uploadAndAnalyzeSimple, parseSql } from "@/api/codeparseController"
 import { ButtonWithTooltip } from "@/components/button-with-tooltip"
 import { ChatInput } from "@/components/chat-input"
 import { ResetWarningModal } from "@/components/reset-warning-modal"
@@ -145,6 +146,62 @@ export default function ChatPanel({
         clearDiagram,
         isDrawioReady,
     } = useDiagram()
+
+    // File input refs for Code/SQL analysis
+    const fileInputCodeRef = useRef<HTMLInputElement>(null)
+    const fileInputSqlRef = useRef<HTMLInputElement>(null)
+
+    const handleCodeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        const toastId = toast.loading("Analyzing Spring Boot project...")
+        try {
+            const res = await uploadAndAnalyzeSimple({}, file)
+            if (res.code === 0 && res.data) {
+                // Construct prompt with analysis result
+                const prompt = `I have uploaded a Spring Boot project. Here is the simplified architecture analysis in JSON format:\n\n\`\`\`json\n${JSON.stringify(res.data, null, 2)}\n\`\`\`\n\nPlease analyze this architecture and generate **Draw.io compatible XML code** for an architecture diagram or class diagram. Ensure the XML code can be directly loaded and displayed by Draw.io. Focus on the Controller, Service, and Repository layers. Please wrap the XML code in \`\`\`xml and \`\`\` code blocks.`
+                
+                // Send message to AI
+                await sendMessage({ role: "user", content: prompt })
+                toast.success("Analysis complete, generating diagram...", { id: toastId })
+            } else {
+                toast.error(res.message || "Analysis failed", { id: toastId })
+            }
+        } catch (error) {
+            console.error("Code upload error:", error)
+            toast.error("Failed to upload project", { id: toastId })
+        } finally {
+            // Reset input
+            if (fileInputCodeRef.current) fileInputCodeRef.current.value = ""
+        }
+    }
+
+    const handleSqlUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        const toastId = toast.loading("Parsing SQL file...")
+        try {
+            const res = await parseSql({}, file)
+            if (res.code === 0 && res.data) {
+                // Construct prompt with analysis result
+                const prompt = `I have uploaded a SQL DDL file. Here is the parsed schema structure in JSON format:\n\n\`\`\`json\n${JSON.stringify(res.data, null, 2)}\n\`\`\`\n\nPlease analyze this schema and generate **Draw.io compatible XML code** for an Entity Relationship (ER) diagram. Include all tables, columns, primary keys, and inferred relationships. Please wrap the XML code in \`\`\`xml and \`\`\` code blocks.`
+                
+                // Send message to AI
+                await sendMessage({ role: "user", content: prompt })
+                toast.success("Parsing complete, generating ER diagram...", { id: toastId })
+            } else {
+                toast.error(res.message || "Parsing failed", { id: toastId })
+            }
+        } catch (error) {
+            console.error("SQL upload error:", error)
+            toast.error("Failed to upload SQL file", { id: toastId })
+        } finally {
+            // Reset input
+            if (fileInputSqlRef.current) fileInputSqlRef.current.value = ""
+        }
+    }
 
     // 获取当前用户ID
     const loginUser = useSelector((state: RootState) => state.loginUser)
@@ -1512,6 +1569,23 @@ Continue from EXACTLY where you stopped.`,
                     onMinimalStyleChange={setMinimalStyle}
                     userId={userId}
                     diagramId={diagramId}
+                    onUploadCode={() => fileInputCodeRef.current?.click()}
+                    onUploadSql={() => fileInputSqlRef.current?.click()}
+                />
+                {/* Hidden file inputs for Code/SQL analysis */}
+                <input
+                    type="file"
+                    ref={fileInputCodeRef}
+                    className="hidden"
+                    accept=".zip"
+                    onChange={handleCodeUpload}
+                />
+                <input
+                    type="file"
+                    ref={fileInputSqlRef}
+                    className="hidden"
+                    accept=".sql"
+                    onChange={handleSqlUpload}
                 />
             </footer>
 

@@ -5,6 +5,8 @@ import {
     Download,
     History,
     Image as ImageIcon,
+    FileCode,
+    Database,
     Loader2,
     Send,
     Square,
@@ -145,6 +147,8 @@ interface ChatInputProps {
     onMinimalStyleChange?: (value: boolean) => void
     userId?: string
     diagramId?: string
+    onUploadCode?: () => void
+    onUploadSql?: () => void
 }
 
 export function ChatInput({
@@ -166,6 +170,8 @@ export function ChatInput({
     onMinimalStyleChange = () => {},
     userId,
     diagramId,
+    onUploadCode,
+    onUploadSql,
 }: ChatInputProps) {
     const { diagramHistory, saveDiagramToFile } = useDiagram()
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -452,6 +458,30 @@ export function ChatInput({
                             className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                         >
                             <ImageIcon className="h-4 w-4" />
+                        </ButtonWithTooltip>
+
+                        <ButtonWithTooltip
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={onUploadCode}
+                            disabled={isDisabled}
+                            tooltipContent="Upload Spring Boot Zip"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                        >
+                            <FileCode className="h-4 w-4" />
+                        </ButtonWithTooltip>
+
+                        <ButtonWithTooltip
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={onUploadSql}
+                            disabled={isDisabled}
+                            tooltipContent="Upload SQL File"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                        >
+                            <Database className="h-4 w-4" />
                         </ButtonWithTooltip>
 
 

@@ -1434,4 +1434,61 @@ declare namespace API {
         /** 确认新密码 */
         checkPassword?: string
     }
+
+    type BaseResponseSimplifiedProjectDTO = {
+        code?: number
+        data?: SimplifiedProjectDTO
+        message?: string
+    }
+
+    type BaseResponseListSqlParseResultDTO = {
+        code?: number
+        data?: SqlParseResultDTO[]
+        message?: string
+    }
+
+    type SimplifiedProjectDTO = {
+        name?: string
+        layers?: string[]
+        components?: ComponentNode[]
+        links?: RelationLink[]
+        externalSystems?: string[]
+    }
+
+    type ComponentNode = {
+        id?: string
+        type?: string
+        layer?: string
+        description?: string
+    }
+
+    type RelationLink = {
+        from?: string
+        to?: string
+        type?: string
+    }
+
+    type SqlParseResultDTO = {
+        tableName?: string
+        comment?: string
+        columns?: ColumnInfoDTO[]
+        relationships?: SqlRelationshipDTO[]
+    }
+
+    type ColumnInfoDTO = {
+        name?: string
+        type?: string
+        primaryKey?: boolean
+        comment?: string
+    }
+
+    type SqlRelationshipDTO = {
+        sourceTable?: string
+        sourceColumn?: string
+        targetTable?: string
+        targetColumn?: string
+        type?: string
+        inferenceMethod?: string
+        confidence?: number
+    }
 }
