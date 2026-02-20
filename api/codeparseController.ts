@@ -1,7 +1,7 @@
 /* eslint-disable */
 import request from "@/lib/request"
 
-/** Upload and Analyze (Architecture Only) POST /codeparse/upload/simple */
+/** Upload and Analyze (Architecture Only) POST /codeparse/springboot/upload/simple */
 export async function uploadAndAnalyzeSimple(
     body: {},
     file: File,
@@ -10,11 +10,9 @@ export async function uploadAndAnalyzeSimple(
     const formData = new FormData()
     formData.append("file", file)
     
-    return request<API.BaseResponseSimplifiedProjectDTO>("/codeparse/upload/simple", {
+    // 注意：不要手动设置 Content-Type，让浏览器自动添加 multipart/form-data; boundary=...
+    return request<API.BaseResponseSimplifiedProjectDTO>("/codeparse/springboot/upload/simple", {
         method: "POST",
-        headers: {
-            "Content-Type": "multipart/form-data",
-        },
         data: formData,
         ...(options || {}),
     })
@@ -29,11 +27,9 @@ export async function parseSql(
     const formData = new FormData()
     formData.append("file", file)
 
+    // 注意：不要手动设置 Content-Type，让浏览器自动添加 multipart/form-data; boundary=...
     return request<API.BaseResponseListSqlParseResultDTO>("/codeparse/parse/sql", {
         method: "POST",
-        headers: {
-            "Content-Type": "multipart/form-data",
-        },
         data: formData,
         ...(options || {}),
     })

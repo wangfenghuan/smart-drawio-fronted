@@ -12,6 +12,7 @@ import {
     Settings,
     Square,
     Trash2,
+    Zap,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import ReactMarkdown from "react-markdown"
@@ -215,24 +216,52 @@ export default function SimpleChatPanel({
         const file = e.target.files?.[0]
         if (!file) return
 
-        const toastId = toast.loading("正在分析 Spring Boot 项目...")
+        const toastId = toast.loading("正在分析 Spring Boot 项目，请稍候...")
         try {
             const res = await uploadAndAnalyzeSimple({}, file)
             if (res.code === 0 && res.data) {
-                // Construct prompt with analysis result
-                const prompt = `我上传了一个 Spring Boot 项目。这是简化的架构分析结果（JSON格式）：\n\n\`\`\`json\n${JSON.stringify(res.data, null, 2)}\n\`\`\`\n\n请分析此架构，并生成**可被 Draw.io 识别的 XML 代码**，用于绘制架构图或类图。请确保生成的 XML 代码可以直接被 Draw.io 加载和显示。重点关注 Controller、Service 和 Repository 层的组件及其关系。请务必将 XML 代码包裹在 \`\`\`xml 和 \`\`\` 代码块中。`
-                
-                // Send message to AI
+                const arch = res.data
+                const layerList = Array.from(arch.layers || []).join("、")
+                const componentCount = arch.components?.length ?? 0
+                const linkCount = arch.links?.length ?? 0
+                const externalList = (arch.externalSystems || []).join("、") || "无"
+
+                const prompt = `你是一位专业的软件架构师，请根据下方 Spring Boot 项目的架构分析结果，生成一张清晰的**分层架构图**，输出格式必须是 Draw.io 可直接导入的 mxfile XML。
+
+## 项目架构分析数据
+\`\`\`json
+${JSON.stringify(arch, null, 2)}
+\`\`\`
+
+## 架构摘要
+- 项目名称：${arch.name}
+- 检测到的层次：${layerList}
+- 组件总数：${componentCount} 个
+- 组件间关系：${linkCount} 条
+- 外部中间件：${externalList}
+
+## 绘图要求（请严格遵守）
+1. **整体布局**：使用 Draw.io 的 **swimlane 泳道容器**，每个架构层单独一个泳道
+2. **颜色规范**：
+   - Controller 层 → 浅蓝色填充 (#dae8fc), 蓝色边框 (#6c8ebf)
+   - Service 层 → 浅黄色填充 (#fff2cc), 橙色边框 (#d6b656)
+   - Repository/Mapper/Data 层 → 浅绿色填充 (#d5e8d4), 绿色边框 (#82b366)
+   - Config/Infrastructure 层 → 浅紫色填充 (#e1d5e7), 紫色边框 (#9673a6)
+   - 外部中间件 → 浅灰色填充 (#f5f5f5), 深灰边框 (#666666)
+3. **组件样式**：每个组件用圆角矩形表示，显示类名和所属层次类型（如 @Controller）
+4. **连接线**：有向箭头表示调用依赖关系，标注类型（CALLS / USES）
+5. **外部系统**：放在最底部或右侧独立区域
+6. **尺寸**：图表整体宽度建议 1200px 左右，层间垂直间距 60px，组件间水平间距 40px`
+
                 await sendMessage(prompt)
-                toast.success("分析完成，正在生成图表...", { id: toastId })
+                toast.success(`分析完成！检测到 ${componentCount} 个组件，正在生成架构图...`, { id: toastId })
             } else {
-                toast.error(res.message || "分析失败", { id: toastId })
+                toast.error(res.message || "项目解析失败，请检查是否上传了有效的 Spring Boot ZIP", { id: toastId })
             }
         } catch (error) {
             console.error("代码上传错误:", error)
-            toast.error("项目上传失败", { id: toastId })
+            toast.error("项目上传失败，请重试", { id: toastId })
         } finally {
-            // Reset input
             if (fileInputCodeRef.current) fileInputCodeRef.current.value = ""
         }
     }
@@ -241,24 +270,49 @@ export default function SimpleChatPanel({
         const file = e.target.files?.[0]
         if (!file) return
 
-        const toastId = toast.loading("正在解析 SQL 文件...")
+        const toastId = toast.loading("正在解析 SQL DDL 文件，请稍候...")
         try {
             const res = await parseSql({}, file)
             if (res.code === 0 && res.data) {
-                // Construct prompt with analysis result
-                const prompt = `我上传了一个 SQL DDL 文件。这是解析后的表结构（JSON格式）：\n\n\`\`\`json\n${JSON.stringify(res.data, null, 2)}\n\`\`\`\n\n请分析此 schema 并生成**可被 Draw.io 识别的 XML 代码**，用于绘制实体关系 (ER) 图。请包含所有表、列、主键和推断的关系。请务必将 XML 代码包裹在 \`\`\`xml 和 \`\`\` 代码块中。`
-                
-                // Send message to AI
+                const tables = res.data
+                const tableCount = tables.length
+                const tableNames = tables.map((t: any) => t.tableName).join("、")
+
+                const prompt = `你是一位专业的数据库架构师，请根据下方 SQL DDL 解析结果，生成一张标准的**实体关系图（ER 图）**，输出格式必须是 Draw.io 可直接导入的 mxfile XML。
+
+## SQL 解析结果
+\`\`\`json
+${JSON.stringify(tables, null, 2)}
+\`\`\`
+
+## 数据库摘要
+- 共 ${tableCount} 张表：${tableNames}
+
+## 绘图要求（请严格遵守）
+1. **表格样式**：每张表使用 Draw.io 内置的 **table/tableRow** 样式（shape=table），展示：
+   - 表名（加粗，作为表头，浅蓝色背景 #dae8fc）
+   - 每列：列名 | 数据类型 | 约束（PK 用 🔑 标注，FK 用 🔗 标注，NOT NULL 用 * 标注）
+   - 表注释作为表头副标题（若有）
+2. **关系线**：
+   - 外键关系用**有向箭头**连接，箭头指向被引用表，标注外键字段名
+   - 语义推断的关联关系用**虚线箭头**表示
+   - 对多关系使用 Draw.io 的 ERone / ERmany 连接端样式
+3. **布局**：自动合理分布，有直接关联的表靠近放置，避免连线交叉
+4. **颜色**：
+   - 主表（被多表引用）→ 表头 #d5e8d4（绿色）
+   - 普通表 → 表头 #dae8fc（蓝色）
+   - 关联/中间表 → 表头 #fff2cc（黄色）
+5. **尺寸**：每张表宽度 220px，行高 28px`
+
                 await sendMessage(prompt)
-                toast.success("解析完成，正在生成 ER 图...", { id: toastId })
+                toast.success(`解析完成！共 ${tableCount} 张表，正在生成 ER 图...`, { id: toastId })
             } else {
-                toast.error(res.message || "解析失败", { id: toastId })
+                toast.error(res.message || "SQL 解析失败，请检查文件格式是否为标准 DDL", { id: toastId })
             }
         } catch (error) {
             console.error("SQL上传错误:", error)
-            toast.error("SQL 文件上传失败", { id: toastId })
+            toast.error("SQL 文件上传失败，请重试", { id: toastId })
         } finally {
-            // Reset input
             if (fileInputSqlRef.current) fileInputSqlRef.current.value = ""
         }
     }
@@ -733,71 +787,96 @@ export default function SimpleChatPanel({
             </div>
 
             {/* 底部输入框 */}
-            <div className="flex-shrink-0 p-4 border-t border-white/10 bg-black/20 z-10">
-                {/* File Previews */}
-                {files.length > 0 && (
-                    <div className="mb-3">
-                         <FilePreviewList
-                            files={files}
-                            onRemoveFile={(file) => setFiles(files.filter(f => f !== file))}
-                            pdfData={pdfData}
-                        />
+            <div className="flex-shrink-0 border-t border-white/10 bg-black/20 z-10">
+                {/* 智能分析快捷工具条 */}
+                <div className="px-3 pt-3 pb-2">
+                    <div className="flex items-center gap-1.5 mb-2">
+                        <Zap className="h-3 w-3 text-yellow-400" />
+                        <span className="text-xs text-white/40 font-medium">智能分析</span>
                     </div>
-                )}
-                
-                <form onSubmit={handleSubmit} className="flex gap-2 items-end">
-                    <div className="flex gap-1 pb-1">
-                        <Button
+                    <div className="flex gap-2">
+                        {/* Spring Boot 架构图按钮 */}
+                        <button
                             type="button"
-                            variant="ghost"
-                            size="icon"
+                            disabled={isLoading}
                             onClick={() => fileInputCodeRef.current?.click()}
-                            className="h-9 w-9 text-white/60 hover:text-white hover:bg-white/10"
-                            title="上传 Spring Boot 项目 (Zip)"
+                            className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200 group
+                                bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-400/50
+                                disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="上传 Spring Boot ZIP 压缩包，自动分析并生成架构图"
                         >
-                            <FileCode className="h-5 w-5" />
-                        </Button>
-                        <Button
+                            <div className="w-6 h-6 rounded-md bg-emerald-500/20 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-500/30 transition-colors">
+                                <FileCode className="h-3.5 w-3.5 text-emerald-400" />
+                            </div>
+                            <div className="text-left min-w-0">
+                                <div className="text-xs font-semibold text-emerald-300 leading-tight">Spring Boot 架构图</div>
+                                <div className="text-[10px] text-white/40 leading-tight truncate">上传 .zip → 自动生成分层架构图</div>
+                            </div>
+                        </button>
+
+                        {/* SQL ER 图按钮 */}
+                        <button
                             type="button"
-                            variant="ghost"
-                            size="icon"
+                            disabled={isLoading}
                             onClick={() => fileInputSqlRef.current?.click()}
-                            className="h-9 w-9 text-white/60 hover:text-white hover:bg-white/10"
-                            title="上传 SQL 文件"
+                            className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200 group
+                                bg-violet-500/10 border-violet-500/30 hover:bg-violet-500/20 hover:border-violet-400/50
+                                disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="上传 SQL DDL 文件，自动解析并生成 ER 图"
                         >
-                            <Database className="h-5 w-5" />
-                        </Button>
+                            <div className="w-6 h-6 rounded-md bg-violet-500/20 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-500/30 transition-colors">
+                                <Database className="h-3.5 w-3.5 text-violet-400" />
+                            </div>
+                            <div className="text-left min-w-0">
+                                <div className="text-xs font-semibold text-violet-300 leading-tight">SQL ER 图</div>
+                                <div className="text-[10px] text-white/40 leading-tight truncate">上传 .sql → 自动生成实体关系图</div>
+                            </div>
+                        </button>
                     </div>
+                </div>
 
-
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="输入你的问题..."
-                        disabled={isLoading}
-                        className="flex-1 px-4 py-3 rounded-xl border border-white/20 bg-white/5 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all disabled:opacity-50 text-sm"
-                    />
-                    {isLoading ? (
-                        <Button
-                            type="button"
-                            onClick={stop}
-                            className="px-5 bg-red-600 hover:bg-red-700 text-white rounded-xl"
-                        >
-                            <Square className="h-4 w-4 mr-2" />
-                            停止
-                        </Button>
-                    ) : (
-                        <Button
-                            type="submit"
-                            disabled={!input.trim()}
-                            className="px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg font-semibold"
-                        >
-                            <Send className="h-4 w-4 mr-2" />
-                            发送
-                        </Button>
+                <div className="px-3 pb-3">
+                    {/* File Previews */}
+                    {files.length > 0 && (
+                        <div className="mb-2">
+                            <FilePreviewList
+                                files={files}
+                                onRemoveFile={(file) => setFiles(files.filter(f => f !== file))}
+                                pdfData={pdfData}
+                            />
+                        </div>
                     )}
-                </form>
+
+                    <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            placeholder="输入你的问题..."
+                            disabled={isLoading}
+                            className="flex-1 px-4 py-3 rounded-xl border border-white/20 bg-white/5 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all disabled:opacity-50 text-sm"
+                        />
+                        {isLoading ? (
+                            <Button
+                                type="button"
+                                onClick={stop}
+                                className="px-5 bg-red-600 hover:bg-red-700 text-white rounded-xl"
+                            >
+                                <Square className="h-4 w-4 mr-2" />
+                                停止
+                            </Button>
+                        ) : (
+                            <Button
+                                type="submit"
+                                disabled={!input.trim() && files.length === 0}
+                                className="px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg font-semibold"
+                            >
+                                <Send className="h-4 w-4 mr-2" />
+                                发送
+                            </Button>
+                        )}
+                    </form>
+                </div>
             </div>
 
             <AIConfigDialog
